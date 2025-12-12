@@ -11,6 +11,7 @@ class User(Base):
     password = Column(String)
     xp = Column(Integer, default=0)
     has_completed_onboarding = Column(Boolean, default=False)
+    profile_picture = Column(Text, nullable=True)  # Base64 encoded image
     
     # Relationships
     portfolio = relationship("Portfolio", back_populates="user", uselist=False)

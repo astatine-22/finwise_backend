@@ -42,6 +42,7 @@ class GoogleLoginRequest(BaseModel):
 class UserProfile(BaseModel):
     name: str
     xp: int
+    profile_picture: Optional[str] = None
 
 class AuthResponse(BaseModel):
     message: str
@@ -78,6 +79,17 @@ class CategorySummary(BaseModel):
 
 class SimpleResponse(BaseModel):
     message: str
+
+
+class ProfilePictureUpdate(BaseModel):
+    email: str
+    profile_picture: str  # Base64 encoded image
+
+
+class ProfileUpdate(BaseModel):
+    email: str
+    name: Optional[str] = None
+    profile_picture: Optional[str] = None
 
 
 # --- HELPER FUNCTION: Date Range Calculator ---
@@ -173,7 +185,37 @@ def get_user_details(email: str, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == email.lower()).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"name": user.name, "xp": user.xp}
+    return {"name": user.name, "xp": user.xp, "profile_picture": user.profile_picture}
+
+
+# 5. UPDATE PROFILE PICTURE
+@app.put("/api/user/profile-picture", response_model=SimpleResponse)
+def update_profile_picture(request: ProfilePictureUpdate, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == request.email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.profile_picture = request.profile_picture
+    db.commit()
+    
+    return {"message": "Profile picture updated successfully"}
+
+
+# 6. UPDATE USER PROFILE (name and profile picture)
+@app.put("/api/user/profile", response_model=SimpleResponse)
+def update_user_profile(request: ProfileUpdate, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == request.email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if request.name is not None:
+        user.name = request.name
+    if request.profile_picture is not None:
+        user.profile_picture = request.profile_picture
+    
+    db.commit()
+    
+    return {"message": "Profile updated successfully"}
 
 
 # --- BUDGET & EXPENSE ROUTES ---
