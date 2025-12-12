@@ -1,10 +1,16 @@
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime, timedelta
 import yfinance as yf
+
+# --- SECURITY IMPORTS ---
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+import secrets
 
 # --- IMPORTS FOR GOOGLE LOGIN ---
 from google.oauth2 import id_token
@@ -20,9 +26,75 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+# =============================================================================
+# SECURITY CONFIGURATION
+# =============================================================================
+
+# JWT Configuration
+# IMPORTANT: In production, use a secure secret key from environment variables
+SECRET_KEY = "your-super-secret-key-change-in-production-finwise-2024"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+
+# Password Hashing Configuration
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# OAuth2 scheme for token authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
 # --- CONFIGURATION ---
 # REPLACE WITH YOUR ACTUAL BACKEND CLIENT ID FROM GOOGLE CLOUD CONSOLE
 GOOGLE_CLIENT_ID = "783108831764-djrpp609l2rj7kch5imn32d5rb474qf7.apps.googleusercontent.com"
+
+
+# =============================================================================
+# SECURITY HELPER FUNCTIONS
+# =============================================================================
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a plain password against a bcrypt hash."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    """Hash a password using bcrypt."""
+    return pwd_context.hash(password)
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Create a JWT access token."""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
+    """
+    Dependency that validates JWT token and returns the current user.
+    Use this to protect any authenticated endpoints.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    user = db.query(models.User).filter(models.User.email == email.lower()).first()
+    if user is None:
+        raise credentials_exception
+    return user
 
 
 # --- Pydantic Models (Data Shapes) ---
@@ -81,6 +153,13 @@ class SimpleResponse(BaseModel):
     message: str
 
 
+class TokenResponse(BaseModel):
+    """Response model for JWT token authentication."""
+    access_token: str
+    token_type: str = "bearer"
+    user: Optional[UserProfile] = None
+
+
 class ProfilePictureUpdate(BaseModel):
     email: str
     profile_picture: str  # Base64 encoded image
@@ -119,45 +198,67 @@ def get_start_date_for_range(range_str: str) -> Optional[datetime]:
 
 # --- API ROUTES ---
 
-# 1. SIGNUP
-@app.post("/api/auth/signup", response_model=AuthResponse)
+# 1. SIGNUP (with bcrypt password hashing)
+@app.post("/api/auth/signup", response_model=TokenResponse)
 def signup(user: SignupRequest, db: Session = Depends(get_db)):
+    """Register a new user with bcrypt password hashing."""
     db_user = db.query(models.User).filter(models.User.email == user.email.lower()).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    # Hash the password before storing
+    hashed_password = get_password_hash(user.password)
+    
     new_user = models.User(
         name=user.name,
         email=user.email.lower(),
-        password=user.password,
+        password=hashed_password,  # Store bcrypt hash, not plaintext
         xp=100
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
+    # Create and return JWT token
+    access_token = create_access_token(data={"sub": new_user.email})
+    
     return {
-        "message": "Signup successful",
-        "user_id": new_user.id,
-        "user": {"name": new_user.name, "xp": new_user.xp}
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {"name": new_user.name, "xp": new_user.xp, "profile_picture": new_user.profile_picture}
     }
 
-# 2. NORMAL LOGIN
-@app.post("/api/auth/login", response_model=AuthResponse)
+# 2. NORMAL LOGIN (with bcrypt verification and JWT token)
+@app.post("/api/auth/login", response_model=TokenResponse)
 def login(user: LoginRequest, db: Session = Depends(get_db)):
+    """Authenticate user with bcrypt password verification and return JWT."""
     db_user = db.query(models.User).filter(models.User.email == user.email.lower()).first()
-    if not db_user or db_user.password == "" or db_user.password != user.password:
+    
+    # Check if user exists
+    if not db_user:
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+    
+    # Check if this is a Google-only account (empty password)
+    if db_user.password == "":
+        raise HTTPException(status_code=400, detail="Please login with Google")
+    
+    # Verify password using bcrypt
+    if not verify_password(user.password, db_user.password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
+    # Create and return JWT token
+    access_token = create_access_token(data={"sub": db_user.email})
+    
     return {
-        "message": "Login successful",
-        "user_id": db_user.id,
-        "user": {"name": db_user.name, "xp": db_user.xp}
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {"name": db_user.name, "xp": db_user.xp, "profile_picture": db_user.profile_picture}
     }
 
-# 3. GOOGLE LOGIN
-@app.post("/api/auth/google", response_model=AuthResponse)
+# 3. GOOGLE LOGIN (with JWT token)
+@app.post("/api/auth/google", response_model=TokenResponse)
 def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db)):
+    """Authenticate via Google OAuth and return JWT."""
     try:
         idinfo = id_token.verify_oauth2_token(
             request.token, 
@@ -169,10 +270,13 @@ def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db)):
 
         user = database.get_or_create_google_user(db, email, name)
 
+        # Create and return JWT token
+        access_token = create_access_token(data={"sub": user.email})
+        
         return {
-            "message": "Google login successful",
-            "user_id": user.id,
-            "user": {"name": user.name, "xp": user.xp}
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {"name": user.name, "xp": user.xp, "profile_picture": user.profile_picture}
         }
 
     except ValueError as e:
