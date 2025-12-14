@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey, DateTime, Text, Date
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -12,9 +12,15 @@ class User(Base):
     xp = Column(Integer, default=0)
     has_completed_onboarding = Column(Boolean, default=False)
     profile_picture = Column(Text, nullable=True)  # Base64 encoded image
+    budget_limit = Column(Float, default=20000.0, nullable=False)  # User's monthly budget limit in ₹
+    
+    # Gamification: Streak tracking
+    last_activity_date = Column(Date, nullable=True)  # Last day user was active
+    current_streak = Column(Integer, default=0)        # Consecutive days of activity
     
     # Relationships
     portfolio = relationship("Portfolio", back_populates="user", uselist=False)
+    achievements = relationship("UserAchievement", back_populates="user")
 
 class Expense(Base):
     __tablename__ = "expenses"
@@ -94,3 +100,42 @@ class Holding(Base):
     
     # Relationship back to portfolio
     portfolio = relationship("Portfolio", back_populates="holdings")
+
+
+# ============================================================================
+# GAMIFICATION MODELS - Achievements & Badges
+# ============================================================================
+
+class Achievement(Base):
+    """
+    Defines available achievements/badges that users can earn.
+    Each achievement has an XP reward and icon reference for frontend display.
+    """
+    __tablename__ = "achievements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, nullable=False)   # Unique identifier e.g., "first_trade"
+    name = Column(String, nullable=False)               # Display name e.g., "Market Debut"
+    description = Column(String, nullable=False)        # What user did to earn it
+    xp_reward = Column(Integer, default=50)             # XP awarded when earned
+    icon_name = Column(String, nullable=False)          # Frontend drawable reference
+    
+    # Relationship to earned instances
+    user_achievements = relationship("UserAchievement", back_populates="achievement")
+
+
+class UserAchievement(Base):
+    """
+    Links users to their earned achievements.
+    Many-to-many relationship between User and Achievement.
+    """
+    __tablename__ = "user_achievements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    achievement_id = Column(Integer, ForeignKey("achievements.id"), nullable=False)
+    earned_at = Column(DateTime, nullable=False)
+    
+    # Relationships
+    user = relationship("User", back_populates="achievements")
+    achievement = relationship("Achievement", back_populates="user_achievements")

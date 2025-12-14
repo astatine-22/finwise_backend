@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime, timedelta
 import yfinance as yf
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 # --- SECURITY IMPORTS ---
 from passlib.context import CryptContext
@@ -95,6 +97,119 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise credentials_exception
     return user
+
+
+# =============================================================================
+# GAMIFICATION HELPER FUNCTIONS
+# =============================================================================
+
+# Level definitions: (min_xp, level_number, title)
+LEVEL_THRESHOLDS = [
+    (0, 1, "Novice"),
+    (500, 2, "Rookie"),
+    (1500, 3, "Pro"),
+    (3000, 4, "Expert"),
+    (5000, 5, "Master"),
+]
+
+
+def calculate_level(xp: int) -> dict:
+    """
+    Calculate user's level based on XP.
+    Returns dict with level info and progress to next level.
+    """
+    current_level = 1
+    current_title = "Novice"
+    current_min_xp = 0
+    next_level_xp = 500
+    
+    for i, (min_xp, level, title) in enumerate(LEVEL_THRESHOLDS):
+        if xp >= min_xp:
+            current_level = level
+            current_title = title
+            current_min_xp = min_xp
+            # Get XP needed for next level
+            if i + 1 < len(LEVEL_THRESHOLDS):
+                next_level_xp = LEVEL_THRESHOLDS[i + 1][0]
+            else:
+                next_level_xp = min_xp + 2000  # Max level, show some progress
+    
+    # Calculate progress percentage
+    xp_in_current_level = xp - current_min_xp
+    xp_range = next_level_xp - current_min_xp
+    progress = min(1.0, xp_in_current_level / xp_range) if xp_range > 0 else 1.0
+    
+    return {
+        "level": current_level,
+        "title": current_title,
+        "xp_for_next_level": next_level_xp,
+        "progress_to_next": round(progress, 2)
+    }
+
+
+def update_user_streak(user: models.User, db: Session) -> int:
+    """
+    Update user's streak based on activity.
+    Call this on key actions (add expense, trade, etc.)
+    Returns the updated streak count.
+    """
+    from datetime import date
+    today = date.today()
+    
+    if user.last_activity_date is None:
+        # First activity ever
+        user.current_streak = 1
+    elif user.last_activity_date == today:
+        # Already active today, no change
+        pass
+    elif user.last_activity_date == today - timedelta(days=1):
+        # Consecutive day - increment streak
+        user.current_streak = (user.current_streak or 0) + 1
+    else:
+        # Streak broken - reset to 1
+        user.current_streak = 1
+    
+    user.last_activity_date = today
+    db.commit()
+    
+    return user.current_streak
+
+
+def check_and_award_achievement(user: models.User, achievement_key: str, db: Session) -> bool:
+    """
+    Check if user has achievement and award it if not.
+    Returns True if newly awarded, False if already had it.
+    """
+    # Check if achievement exists
+    achievement = db.query(models.Achievement).filter(
+        models.Achievement.key == achievement_key
+    ).first()
+    
+    if not achievement:
+        return False
+    
+    # Check if user already has this achievement
+    existing = db.query(models.UserAchievement).filter(
+        models.UserAchievement.user_id == user.id,
+        models.UserAchievement.achievement_id == achievement.id
+    ).first()
+    
+    if existing:
+        return False
+    
+    # Award the achievement
+    new_achievement = models.UserAchievement(
+        user_id=user.id,
+        achievement_id=achievement.id,
+        earned_at=datetime.utcnow()
+    )
+    db.add(new_achievement)
+    
+    # Add XP reward
+    user.xp = (user.xp or 0) + achievement.xp_reward
+    
+    db.commit()
+    return True
 
 
 # --- Pydantic Models (Data Shapes) ---
@@ -322,9 +437,30 @@ def update_user_profile(request: ProfileUpdate, db: Session = Depends(get_db)):
     return {"message": "Profile updated successfully"}
 
 
+# 6b. UPDATE BUDGET LIMIT
+class BudgetLimitUpdate(BaseModel):
+    email: str
+    budget_limit: float = Field(..., gt=0, description="Monthly budget limit in ₹")
+
+
+@app.put("/api/user/budget-limit", response_model=SimpleResponse)
+def update_budget_limit(request: BudgetLimitUpdate, db: Session = Depends(get_db)):
+    """
+    Update the user's monthly budget limit.
+    """
+    user = db.query(models.User).filter(models.User.email == request.email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.budget_limit = request.budget_limit
+    db.commit()
+    
+    return {"message": f"Budget limit updated to ₹{request.budget_limit:,.2f}"}
+
+
 # --- BUDGET & EXPENSE ROUTES ---
 
-# 5. ADD EXPENSE (UPDATED to accept optional date)
+# 5. ADD EXPENSE (UPDATED to accept optional date - with gamification)
 @app.post("/api/expenses", response_model=SimpleResponse)
 def add_expense(expense: ExpenseCreate, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == expense.email.lower()).first()
@@ -344,6 +480,22 @@ def add_expense(expense: ExpenseCreate, db: Session = Depends(get_db)):
     
     db.add(new_expense)
     db.commit()
+    
+    # --- GAMIFICATION: Update streak and check achievements ---
+    update_user_streak(user, db)
+    
+    # Check for first expense achievement
+    expense_count = db.query(models.Expense).filter(models.Expense.user_id == user.id).count()
+    if expense_count == 1:
+        check_and_award_achievement(user, "first_expense", db)
+    
+    # Check for streak achievements
+    if user.current_streak >= 7:
+        check_and_award_achievement(user, "week_streak", db)
+    if user.current_streak >= 30:
+        check_and_award_achievement(user, "month_streak", db)
+    # ---------------------------------------------------------
+    
     return {"message": "Expense added!"}
 
 # 6. GET EXPENSES LIST (With Range Filter)
@@ -375,13 +527,18 @@ def get_expenses(email: str, range: str = Query("1m"), db: Session = Depends(get
         })
     return results
 
-# 7. GET BUDGET SUMMARY (With Range Filter)
+# 7. GET BUDGET SUMMARY (With Range Filter - uses user's configurable budget limit)
 @app.get("/api/budget/summary/{email}", response_model=BudgetSummaryResponse)
 def get_budget_summary(email: str, range: str = Query("1m"), db: Session = Depends(get_db)):
-    # Hardcoded limit for now. In the future, this could be dynamic based on range.
-    budget_limit = 20000.0 
-
+    """
+    Fetches budget summary using the user's configured budget limit.
+    Falls back to default ₹20,000 if user not found or limit not set.
+    """
     user = db.query(models.User).filter(models.User.email == email.lower()).first()
+    
+    # Get user's budget limit (or default if not set/user not found)
+    budget_limit = user.budget_limit if user and user.budget_limit else 20000.0
+    
     if not user:
         return {"total_spent": 0, "limit": budget_limit, "remaining": budget_limit}
 
@@ -723,6 +880,19 @@ def get_current_price(symbol: str) -> Optional[float]:
         return None
 
 
+# Global ThreadPoolExecutor for non-blocking I/O operations
+_executor = ThreadPoolExecutor(max_workers=10)
+
+
+async def get_current_price_async(symbol: str) -> Optional[float]:
+    """
+    Async wrapper for get_current_price that runs yfinance in a thread pool.
+    This prevents blocking the main FastAPI event loop during market data fetches.
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_executor, get_current_price, symbol)
+
+
 def get_or_create_portfolio(user: models.User, db: Session) -> models.Portfolio:
     """
     Gets the user's portfolio, or creates one with initial ₹1,00,000 if it doesn't exist.
@@ -747,7 +917,7 @@ def get_or_create_portfolio(user: models.User, db: Session) -> models.Portfolio:
 # --- Paper Trading API Endpoints ---
 
 @app.get("/api/trade/portfolio", response_model=PortfolioSummaryResponse)
-def get_portfolio_summary(email: str = Query(...), db: Session = Depends(get_db)):
+async def get_portfolio_summary(email: str = Query(...), db: Session = Depends(get_db)):
     """
     GET /api/trade/portfolio
     
@@ -757,7 +927,8 @@ def get_portfolio_summary(email: str = Query(...), db: Session = Depends(get_db)
     - Total portfolio value (cash + holdings)
     - Profit/loss calculations for each holding
     
-    If the user doesn't have a portfolio, one is created with $10,000.
+    Uses async/await with ThreadPoolExecutor for non-blocking price fetches.
+    If the user doesn't have a portfolio, one is created with ₹1,00,000.
     """
     # Find user by email
     user = db.query(models.User).filter(models.User.email == email.lower()).first()
@@ -767,14 +938,19 @@ def get_portfolio_summary(email: str = Query(...), db: Session = Depends(get_db)
     # Get or create portfolio
     portfolio = get_or_create_portfolio(user, db)
     
-    # Build holdings response with real-time prices
+    # Fetch all prices concurrently using asyncio.gather
+    holdings = portfolio.holdings
+    if holdings:
+        price_tasks = [get_current_price_async(h.asset_symbol) for h in holdings]
+        prices = await asyncio.gather(*price_tasks)
+    else:
+        prices = []
+    
+    # Build holdings response with fetched prices
     holdings_response: List[HoldingResponse] = []
     total_holdings_value = 0.0
     
-    for holding in portfolio.holdings:
-        # Fetch current market price
-        current_price = get_current_price(holding.asset_symbol)
-        
+    for holding, current_price in zip(holdings, prices):
         if current_price is not None:
             current_value = current_price * holding.quantity
             cost_basis = holding.average_buy_price * holding.quantity
@@ -784,6 +960,7 @@ def get_portfolio_summary(email: str = Query(...), db: Session = Depends(get_db)
         else:
             # If price fetch fails, use average buy price as fallback
             current_value = holding.average_buy_price * holding.quantity
+            current_price = holding.average_buy_price
             profit_loss = 0.0
             profit_loss_percent = 0.0
             total_holdings_value += current_value
@@ -933,6 +1110,25 @@ def execute_buy_order(
         # Commit the transaction
         db.commit()
         
+        # --- GAMIFICATION: Update streak and check achievements ---
+        update_user_streak(user, db)
+        
+        # Check for first trade achievement
+        total_trades = len(portfolio.holdings)
+        if total_trades == 1 and not existing_holding:
+            check_and_award_achievement(user, "first_trade", db)
+        
+        # Check for diversifier achievement (5+ different stocks)
+        if total_trades >= 5:
+            check_and_award_achievement(user, "diversifier", db)
+        
+        # Check streak achievements
+        if user.current_streak >= 7:
+            check_and_award_achievement(user, "week_streak", db)
+        if user.current_streak >= 30:
+            check_and_award_achievement(user, "month_streak", db)
+        # ---------------------------------------------------------
+        
         return TradeExecutionResponse(
             message=f"Successfully purchased {quantity} units of {symbol}",
             asset_symbol=symbol,
@@ -950,6 +1146,119 @@ def execute_buy_order(
         raise HTTPException(
             status_code=500,
             detail=f"Trade execution failed: {str(e)}"
+        )
+
+
+# --- SELL ASSET ENDPOINT ---
+
+class SellRequest(BaseModel):
+    """Request schema for selling an asset."""
+    email: str
+    symbol: str
+    quantity: float = Field(..., gt=0, description="Number of shares/units to sell")
+
+
+class SellExecutionResponse(BaseModel):
+    """Response schema for successful sell order execution."""
+    message: str
+    asset_symbol: str
+    quantity_sold: float
+    executed_price: float
+    total_proceeds: float  # Amount added to cash balance
+    remaining_cash: float
+    remaining_quantity: float  # Remaining holding quantity (0 if fully sold)
+
+
+@app.post("/api/trade/sell", response_model=SellExecutionResponse)
+def sell_asset(request: SellRequest, db: Session = Depends(get_db)):
+    """
+    POST /api/trade/sell
+    
+    Sells a specified quantity of an asset from the user's portfolio.
+    - Validates user owns the asset and has sufficient quantity
+    - Fetches current market price from Yahoo Finance
+    - Increases virtual cash balance by sale proceeds
+    - Updates or removes the holding
+    
+    Returns execution details including proceeds and remaining position.
+    """
+    email = request.email.lower().strip()
+    symbol = request.symbol.upper().strip()
+    quantity = request.quantity
+    
+    # Find user
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get portfolio
+    if not user.portfolio:
+        raise HTTPException(status_code=400, detail="No portfolio found. You need to buy assets first.")
+    
+    portfolio = user.portfolio
+    
+    # Find the holding
+    holding = db.query(models.Holding).filter(
+        models.Holding.portfolio_id == portfolio.id,
+        models.Holding.asset_symbol == symbol
+    ).first()
+    
+    if not holding:
+        raise HTTPException(
+            status_code=400,
+            detail=f"You don't own any {symbol}. Cannot sell."
+        )
+    
+    # Check if user has enough quantity
+    if holding.quantity < quantity:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient holdings. You own {holding.quantity:.4f} {symbol}, but tried to sell {quantity:.4f}."
+        )
+    
+    # Get current market price
+    current_price = get_current_price(symbol)
+    if current_price is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Unable to fetch current price for {symbol}. Market may be closed or symbol is invalid."
+        )
+    
+    try:
+        # Calculate proceeds
+        total_proceeds = current_price * quantity
+        
+        # Update cash balance
+        portfolio.virtual_cash += total_proceeds
+        
+        # Update or remove holding
+        if holding.quantity == quantity:
+            # Selling entire position - remove holding
+            db.delete(holding)
+            remaining_quantity = 0.0
+        else:
+            # Partial sell - update quantity (average price stays the same)
+            holding.quantity -= quantity
+            remaining_quantity = holding.quantity
+        
+        # Commit transaction
+        db.commit()
+        
+        return SellExecutionResponse(
+            message=f"Successfully sold {quantity} units of {symbol}",
+            asset_symbol=symbol,
+            quantity_sold=quantity,
+            executed_price=round(current_price, 2),
+            total_proceeds=round(total_proceeds, 2),
+            remaining_cash=round(portfolio.virtual_cash, 2),
+            remaining_quantity=round(remaining_quantity, 4)
+        )
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Sell order failed: {str(e)}"
         )
 
 
@@ -1332,3 +1641,206 @@ def reset_portfolio(email: str = Query(...), db: Session = Depends(get_db)):
     db.commit()
     
     return {"message": "Portfolio reset to initial state. You have ₹1,00,000 to trade!"}
+
+
+# =============================================================================
+# GAMIFICATION API ENDPOINTS
+# =============================================================================
+
+class GamificationResponse(BaseModel):
+    """Complete gamification status for a user."""
+    xp: int
+    level: int
+    level_title: str
+    progress_to_next: float  # 0.0 to 1.0
+    xp_for_next_level: int
+    current_streak: int
+    earned_achievements: List[str]  # List of achievement keys
+
+
+class AchievementDefResponse(BaseModel):
+    """Achievement definition for display."""
+    key: str
+    name: str
+    description: str
+    xp_reward: int
+    icon_name: str
+
+
+@app.get("/api/user/gamification/{email}", response_model=GamificationResponse)
+def get_user_gamification(email: str, db: Session = Depends(get_db)):
+    """
+    GET /api/user/gamification/{email}
+    
+    Returns complete gamification status including:
+    - XP and level info
+    - Streak count
+    - List of earned achievement keys
+    """
+    user = db.query(models.User).filter(models.User.email == email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Calculate level
+    level_info = calculate_level(user.xp or 0)
+    
+    # Get earned achievements
+    earned = db.query(models.UserAchievement).filter(
+        models.UserAchievement.user_id == user.id
+    ).all()
+    
+    earned_keys = []
+    for ua in earned:
+        achievement = db.query(models.Achievement).filter(
+            models.Achievement.id == ua.achievement_id
+        ).first()
+        if achievement:
+            earned_keys.append(achievement.key)
+    
+    return GamificationResponse(
+        xp=user.xp or 0,
+        level=level_info["level"],
+        level_title=level_info["title"],
+        progress_to_next=level_info["progress_to_next"],
+        xp_for_next_level=level_info["xp_for_next_level"],
+        current_streak=user.current_streak or 0,
+        earned_achievements=earned_keys
+    )
+
+
+@app.get("/api/achievements/all", response_model=List[AchievementDefResponse])
+def get_all_achievements(db: Session = Depends(get_db)):
+    """
+    GET /api/achievements/all
+    
+    Returns all available achievements for trophy case display.
+    """
+    achievements = db.query(models.Achievement).all()
+    return [
+        AchievementDefResponse(
+            key=a.key,
+            name=a.name,
+            description=a.description,
+            xp_reward=a.xp_reward,
+            icon_name=a.icon_name
+        )
+        for a in achievements
+    ]
+
+
+@app.post("/api/achievements/seed", response_model=SimpleResponse)
+def seed_achievements(db: Session = Depends(get_db)):
+    """
+    POST /api/achievements/seed
+    
+    Seeds the database with predefined achievements.
+    Only adds if table is empty.
+    """
+    existing = db.query(models.Achievement).count()
+    if existing > 0:
+        return {"message": f"Achievements already seeded ({existing} found). Skipping."}
+    
+    achievements = [
+        {"key": "first_expense", "name": "Budget Beginner", "description": "Add your first expense", "xp_reward": 25, "icon_name": "ic_badge_expense"},
+        {"key": "first_trade", "name": "Market Debut", "description": "Complete your first trade", "xp_reward": 50, "icon_name": "ic_badge_trade"},
+        {"key": "week_streak", "name": "Week Warrior", "description": "Use app 7 days in a row", "xp_reward": 100, "icon_name": "ic_badge_streak"},
+        {"key": "month_streak", "name": "Consistency King", "description": "Use app 30 days straight", "xp_reward": 500, "icon_name": "ic_badge_crown"},
+        {"key": "budget_master", "name": "Budget Master", "description": "Stay under budget for 30 days", "xp_reward": 200, "icon_name": "ic_badge_budget"},
+        {"key": "diversifier", "name": "Diversifier", "description": "Own 5 different stocks", "xp_reward": 75, "icon_name": "ic_badge_diversify"},
+    ]
+    
+    for ach in achievements:
+        db.add(models.Achievement(**ach))
+    
+    db.commit()
+    return {"message": f"Successfully seeded {len(achievements)} achievements!"}
+
+
+# =============================================================================
+# LEADERBOARD API ENDPOINTS (Hall of Fame)
+# =============================================================================
+
+class LeaderboardEntry(BaseModel):
+    """A single entry in the leaderboard with privacy-safe display name."""
+    rank: int
+    display_name: str  # Privacy-safe: "John D." not full name/email
+    xp: int
+    profile_picture: Optional[str] = None  # Base64 encoded image
+
+
+class LeaderboardResponse(BaseModel):
+    """Complete leaderboard response with top users and current user's rank."""
+    top_users: List[LeaderboardEntry]
+    user_rank: int
+    user_xp: int
+    user_display_name: str
+    user_profile_picture: Optional[str] = None
+
+
+def create_display_name(full_name: str) -> str:
+    """
+    Convert full name to privacy-safe display name.
+    "Rahul Sharma" -> "Rahul S."
+    "Alice" -> "Alice"
+    """
+    if not full_name or full_name.strip() == "":
+        return "Anonymous"
+    
+    parts = full_name.strip().split()
+    if len(parts) == 1:
+        return parts[0]
+    
+    first_name = parts[0]
+    last_initial = parts[-1][0].upper() + "."
+    return f"{first_name} {last_initial}"
+
+
+@app.get("/api/leaderboard", response_model=LeaderboardResponse)
+def get_leaderboard(email: str = Query(...), db: Session = Depends(get_db)):
+    """
+    GET /api/leaderboard
+    
+    Returns the Top 50 users ranked by XP with privacy-safe display names,
+    plus the requesting user's rank (even if outside Top 50).
+    
+    Query params:
+    - email: The requesting user's email to calculate their rank
+    """
+    # Find current user
+    current_user = db.query(models.User).filter(
+        models.User.email == email.lower()
+    ).first()
+    
+    if not current_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # --- Query Top 50 users by XP (descending) ---
+    top_users = db.query(models.User).order_by(
+        models.User.xp.desc()
+    ).limit(50).all()
+    
+    # Build leaderboard entries with privacy-safe names
+    leaderboard_entries = []
+    for rank, user in enumerate(top_users, start=1):
+        leaderboard_entries.append(LeaderboardEntry(
+            rank=rank,
+            display_name=create_display_name(user.name),
+            xp=user.xp or 0,
+            profile_picture=user.profile_picture
+        ))
+    
+    # --- Calculate current user's rank efficiently ---
+    # Count how many users have MORE XP than current user
+    users_above = db.query(models.User).filter(
+        models.User.xp > (current_user.xp or 0)
+    ).count()
+    
+    user_rank = users_above + 1
+    
+    return LeaderboardResponse(
+        top_users=leaderboard_entries,
+        user_rank=user_rank,
+        user_xp=current_user.xp or 0,
+        user_display_name=create_display_name(current_user.name),
+        user_profile_picture=current_user.profile_picture
+    )
