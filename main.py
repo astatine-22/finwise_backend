@@ -1844,3 +1844,330 @@ def get_leaderboard(email: str = Query(...), db: Session = Depends(get_db)):
         user_display_name=create_display_name(current_user.name),
         user_profile_picture=current_user.profile_picture
     )
+
+
+# =============================================================================
+# MARKET DATA ENDPOINTS (INDmoney-style)
+# =============================================================================
+
+class MarketIndex(BaseModel):
+    """Schema for market index data."""
+    name: str
+    symbol: str
+    value: float
+    change: float
+    change_percent: float
+    is_positive: bool
+
+
+class MarketIndicesResponse(BaseModel):
+    """Response schema for market indices."""
+    indices: List[MarketIndex]
+
+
+@app.get("/api/market/indices", response_model=MarketIndicesResponse)
+def get_market_indices():
+    """
+    GET /api/market/indices
+    
+    Returns current values of major Indian market indices:
+    - NIFTY 50
+    - SENSEX
+    - BANK NIFTY
+    """
+    indices_symbols = [
+        ("NIFTY 50", "^NSEI"),
+        ("SENSEX", "^BSESN"),
+        ("BANK NIFTY", "^NSEBANK"),
+    ]
+    
+    result = []
+    
+    for name, symbol in indices_symbols:
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="2d")
+            
+            if not hist.empty and len(hist) >= 1:
+                current_value = float(hist['Close'].iloc[-1])
+                prev_close = float(hist['Close'].iloc[-2]) if len(hist) >= 2 else current_value
+                change = current_value - prev_close
+                change_percent = (change / prev_close) * 100 if prev_close > 0 else 0
+                
+                result.append(MarketIndex(
+                    name=name,
+                    symbol=symbol,
+                    value=round(current_value, 2),
+                    change=round(change, 2),
+                    change_percent=round(change_percent, 2),
+                    is_positive=change >= 0
+                ))
+        except Exception as e:
+            print(f"Error fetching {name}: {e}")
+            # Add placeholder if fetch fails
+            result.append(MarketIndex(
+                name=name,
+                symbol=symbol,
+                value=0,
+                change=0,
+                change_percent=0,
+                is_positive=True
+            ))
+    
+    return MarketIndicesResponse(indices=result)
+
+
+# --- Top Gainers/Losers ---
+
+class StockItem(BaseModel):
+    """Schema for stock item in lists."""
+    symbol: str
+    name: str
+    sector: Optional[str] = None
+    price: float
+    change: float
+    change_percent: float
+    is_positive: bool
+    logo_initial: str  # First letter for placeholder logo
+
+
+class StockListResponse(BaseModel):
+    """Response schema for stock lists."""
+    stocks: List[StockItem]
+
+
+# Popular Indian stocks for gainers/losers tracking
+TRACKED_INDIAN_STOCKS = [
+    ("RELIANCE.NS", "Reliance Industries", "Energy"),
+    ("TCS.NS", "Tata Consultancy", "Technology"),
+    ("INFY.NS", "Infosys", "Technology"),
+    ("HDFCBANK.NS", "HDFC Bank", "Banking"),
+    ("ICICIBANK.NS", "ICICI Bank", "Banking"),
+    ("SBIN.NS", "State Bank of India", "Banking"),
+    ("BHARTIARTL.NS", "Bharti Airtel", "Telecom"),
+    ("ITC.NS", "ITC Limited", "Consumer"),
+    ("KOTAKBANK.NS", "Kotak Mahindra", "Banking"),
+    ("LT.NS", "Larsen & Toubro", "Infrastructure"),
+    ("AXISBANK.NS", "Axis Bank", "Banking"),
+    ("WIPRO.NS", "Wipro", "Technology"),
+    ("HCLTECH.NS", "HCL Technologies", "Technology"),
+    ("MARUTI.NS", "Maruti Suzuki", "Automobile"),
+    ("TATAMOTORS.NS", "Tata Motors", "Automobile"),
+    ("SUNPHARMA.NS", "Sun Pharma", "Pharma"),
+    ("BAJFINANCE.NS", "Bajaj Finance", "Finance"),
+    ("TITAN.NS", "Titan Company", "Consumer"),
+    ("ADANIENT.NS", "Adani Enterprises", "Conglomerate"),
+    ("POWERGRID.NS", "Power Grid", "Utilities"),
+]
+
+
+def fetch_stock_data(stock_info):
+    """Fetch stock data for a single stock."""
+    symbol, name, sector = stock_info
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="2d")
+        
+        if not hist.empty and len(hist) >= 1:
+            current_price = float(hist['Close'].iloc[-1])
+            prev_close = float(hist['Close'].iloc[-2]) if len(hist) >= 2 else current_price
+            change = current_price - prev_close
+            change_percent = (change / prev_close) * 100 if prev_close > 0 else 0
+            
+            return StockItem(
+                symbol=symbol.replace(".NS", ""),
+                name=name,
+                sector=sector,
+                price=round(current_price, 2),
+                change=round(change, 2),
+                change_percent=round(change_percent, 2),
+                is_positive=change >= 0,
+                logo_initial=name[0].upper()
+            )
+    except Exception as e:
+        print(f"Error fetching {symbol}: {e}")
+    return None
+
+
+@app.get("/api/market/stocks", response_model=StockListResponse)
+def get_all_stocks():
+    """
+    GET /api/market/stocks
+    
+    Returns list of popular Indian stocks with current prices.
+    """
+    stocks = []
+    
+    # Use ThreadPoolExecutor for parallel fetching
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(fetch_stock_data, TRACKED_INDIAN_STOCKS))
+    
+    stocks = [s for s in results if s is not None]
+    
+    # Sort by change percent (highest first for explore view)
+    stocks.sort(key=lambda x: abs(x.change_percent), reverse=True)
+    
+    return StockListResponse(stocks=stocks)
+
+
+@app.get("/api/market/top-gainers", response_model=StockListResponse)
+def get_top_gainers():
+    """
+    GET /api/market/top-gainers
+    
+    Returns top 10 gaining stocks.
+    """
+    stocks = []
+    
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(fetch_stock_data, TRACKED_INDIAN_STOCKS))
+    
+    stocks = [s for s in results if s is not None and s.is_positive]
+    stocks.sort(key=lambda x: x.change_percent, reverse=True)
+    
+    return StockListResponse(stocks=stocks[:10])
+
+
+@app.get("/api/market/top-losers", response_model=StockListResponse)
+def get_top_losers():
+    """
+    GET /api/market/top-losers
+    
+    Returns top 10 losing stocks.
+    """
+    stocks = []
+    
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(fetch_stock_data, TRACKED_INDIAN_STOCKS))
+    
+    stocks = [s for s in results if s is not None and not s.is_positive]
+    stocks.sort(key=lambda x: x.change_percent)  # Most negative first
+    
+    return StockListResponse(stocks=stocks[:10])
+
+
+# =============================================================================
+# CRYPTO ENDPOINTS
+# =============================================================================
+
+TRACKED_CRYPTOS = [
+    ("BTC-USD", "Bitcoin", "BTC"),
+    ("ETH-USD", "Ethereum", "ETH"),
+    ("SOL-USD", "Solana", "SOL"),
+    ("XRP-USD", "XRP", "XRP"),
+    ("DOGE-USD", "Dogecoin", "DOGE"),
+    ("ADA-USD", "Cardano", "ADA"),
+    ("AVAX-USD", "Avalanche", "AVAX"),
+    ("DOT-USD", "Polkadot", "DOT"),
+    ("MATIC-USD", "Polygon", "MATIC"),
+    ("LINK-USD", "Chainlink", "LINK"),
+    ("SHIB-USD", "Shiba Inu", "SHIB"),
+    ("LTC-USD", "Litecoin", "LTC"),
+]
+
+
+class CryptoItem(BaseModel):
+    """Schema for crypto item."""
+    symbol: str
+    name: str
+    short_name: str
+    price_usd: float
+    price_inr: float
+    change_24h: float
+    change_percent_24h: float
+    is_positive: bool
+    logo_initial: str
+
+
+class CryptoListResponse(BaseModel):
+    """Response schema for crypto list."""
+    cryptos: List[CryptoItem]
+    usd_to_inr: float
+
+
+def fetch_crypto_data(crypto_info, usd_to_inr: float):
+    """Fetch data for a single crypto."""
+    symbol, name, short_name = crypto_info
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="2d")
+        
+        if not hist.empty and len(hist) >= 1:
+            current_price = float(hist['Close'].iloc[-1])
+            prev_close = float(hist['Close'].iloc[-2]) if len(hist) >= 2 else current_price
+            change = current_price - prev_close
+            change_percent = (change / prev_close) * 100 if prev_close > 0 else 0
+            
+            return CryptoItem(
+                symbol=symbol,
+                name=name,
+                short_name=short_name,
+                price_usd=round(current_price, 2),
+                price_inr=round(current_price * usd_to_inr, 2),
+                change_24h=round(change, 2),
+                change_percent_24h=round(change_percent, 2),
+                is_positive=change >= 0,
+                logo_initial=short_name[0].upper()
+            )
+    except Exception as e:
+        print(f"Error fetching {symbol}: {e}")
+    return None
+
+
+@app.get("/api/crypto/list", response_model=CryptoListResponse)
+def get_crypto_list():
+    """
+    GET /api/crypto/list
+    
+    Returns list of popular cryptocurrencies with prices in USD and INR.
+    """
+    # Get USD to INR rate
+    usd_to_inr = 83.5  # Default fallback
+    try:
+        fx_ticker = yf.Ticker("USDINR=X")
+        fx_hist = fx_ticker.history(period="1d")
+        if not fx_hist.empty:
+            usd_to_inr = float(fx_hist['Close'].iloc[-1])
+    except:
+        pass
+    
+    cryptos = []
+    
+    # Fetch crypto data with exchange rate
+    def fetch_with_rate(crypto_info):
+        return fetch_crypto_data(crypto_info, usd_to_inr)
+    
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        results = list(executor.map(fetch_with_rate, TRACKED_CRYPTOS))
+    
+    cryptos = [c for c in results if c is not None]
+    
+    return CryptoListResponse(cryptos=cryptos, usd_to_inr=round(usd_to_inr, 2))
+
+
+@app.get("/api/crypto/top-gainers", response_model=CryptoListResponse)
+def get_crypto_gainers():
+    """
+    GET /api/crypto/top-gainers
+    
+    Returns top gaining cryptos.
+    """
+    usd_to_inr = 83.5
+    try:
+        fx_ticker = yf.Ticker("USDINR=X")
+        fx_hist = fx_ticker.history(period="1d")
+        if not fx_hist.empty:
+            usd_to_inr = float(fx_hist['Close'].iloc[-1])
+    except:
+        pass
+    
+    def fetch_with_rate(crypto_info):
+        return fetch_crypto_data(crypto_info, usd_to_inr)
+    
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        results = list(executor.map(fetch_with_rate, TRACKED_CRYPTOS))
+    
+    cryptos = [c for c in results if c is not None and c.is_positive]
+    cryptos.sort(key=lambda x: x.change_percent_24h, reverse=True)
+    
+    return CryptoListResponse(cryptos=cryptos, usd_to_inr=round(usd_to_inr, 2))
