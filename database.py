@@ -1,14 +1,33 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 # NOTE: We removed 'import models' from here to prevent circular import errors
 
-# Create SQLite database file
-SQLALCHEMY_DATABASE_URL = "sqlite:///./finwise.db"
+# =============================================================================
+# DATABASE CONFIGURATION - Cloud Ready
+# =============================================================================
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+# Try to read DATABASE_URL from environment variables (for cloud deployment)
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    # CRUCIAL FIX for Render/Railway: SQLAlchemy requires 'postgresql://' not 'postgres://'
+    # Many cloud providers still use the older 'postgres://' format
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    SQLALCHEMY_DATABASE_URL = DATABASE_URL
+    # PostgreSQL doesn't need check_same_thread argument
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+else:
+    # Fallback to local SQLite for development
+    SQLALCHEMY_DATABASE_URL = "sqlite:///./finwise.db"
+    # SQLite requires check_same_thread=False for FastAPI's async nature
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

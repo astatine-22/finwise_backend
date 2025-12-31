@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, Field
@@ -8,6 +9,7 @@ from datetime import datetime, timedelta
 import yfinance as yf
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import os
 
 # --- SECURITY IMPORTS ---
 from passlib.context import CryptContext
@@ -29,12 +31,31 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 # =============================================================================
+# CORS CONFIGURATION - Cloud Ready
+# =============================================================================
+# Read allowed origins from environment variable, or allow all for mobile app access
+cors_origins_env = os.getenv("CORS_ORIGINS", "*")
+if cors_origins_env == "*":
+    allow_origins = ["*"]
+else:
+    # Split comma-separated origins
+    allow_origins = [origin.strip() for origin in cors_origins_env.split(",")]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# =============================================================================
 # SECURITY CONFIGURATION
 # =============================================================================
 
 # JWT Configuration
-# IMPORTANT: In production, use a secure secret key from environment variables
-SECRET_KEY = "your-super-secret-key-change-in-production-finwise-2024"
+# Read from environment variable in production, fallback to default for local dev
+SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production-finwise-2024")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
@@ -44,9 +65,12 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-# --- CONFIGURATION ---
-# REPLACE WITH YOUR ACTUAL BACKEND CLIENT ID FROM GOOGLE CLOUD CONSOLE
-GOOGLE_CLIENT_ID = "783108831764-djrpp609l2rj7kch5imn32d5rb474qf7.apps.googleusercontent.com"
+# --- GOOGLE OAUTH CONFIGURATION ---
+# Read from environment variable in production
+GOOGLE_CLIENT_ID = os.getenv(
+    "GOOGLE_CLIENT_ID", 
+    "783108831764-djrpp609l2rj7kch5imn32d5rb474qf7.apps.googleusercontent.com"
+)
 
 
 # =============================================================================
