@@ -1532,9 +1532,12 @@ def get_transaction_history(email: str = Query(...), db: Session = Depends(get_d
 class AssetPriceResponse(BaseModel):
     """Response schema for asset price lookup."""
     symbol: str
-    current_price: Optional[float]
-    currency: str = "USD"
+    current_price: Optional[float]      # Price in ₹ (converted if USD)
+    currency: str = "INR"               # Always INR for consistency
     source: str = "Yahoo Finance"
+    is_usd_converted: bool = False      # True if price was converted from USD
+    usd_to_inr_rate: Optional[float] = None  # Conversion rate if applicable
+    original_usd_price: Optional[float] = None  # Original USD price if converted
 
 
 @app.get("/api/trade/price/{symbol}", response_model=AssetPriceResponse)
@@ -1544,19 +1547,40 @@ def get_asset_price(symbol: str):
     
     Utility endpoint to look up the current price of any asset.
     Useful for the frontend to display prices before placing an order.
+    
+    IMPORTANT: For US stocks (AAPL, TSLA, etc.), the price is automatically
+    converted from USD to INR using the live exchange rate.
+    This ensures consistency - all prices shown in the app are in ₹.
     """
     normalized_symbol = symbol.upper().strip()
-    price = get_current_price(normalized_symbol)
+    raw_price = get_current_price(normalized_symbol)
     
-    if price is None:
+    if raw_price is None:
         raise HTTPException(
             status_code=404,
             detail=f"Could not find price for symbol '{normalized_symbol}'. Please verify the symbol is valid."
         )
     
+    # Check if this is a US stock that needs conversion
+    is_usd = is_us_stock(normalized_symbol)
+    usd_rate = None
+    original_usd = None
+    
+    if is_usd:
+        usd_rate = get_usd_to_inr_rate()
+        original_usd = raw_price
+        price_inr = raw_price * usd_rate
+        print(f"[Price API] US Stock {normalized_symbol}: ${raw_price:.2f} USD → ₹{price_inr:.2f} INR (rate: {usd_rate})")
+    else:
+        price_inr = raw_price
+    
     return AssetPriceResponse(
         symbol=normalized_symbol,
-        current_price=round(price, 2)
+        current_price=round(price_inr, 2),
+        currency="INR",
+        is_usd_converted=is_usd,
+        usd_to_inr_rate=round(usd_rate, 2) if usd_rate else None,
+        original_usd_price=round(original_usd, 2) if original_usd else None
     )
 
 
@@ -1565,17 +1589,19 @@ def get_asset_price(symbol: str):
 class PricePoint(BaseModel):
     """Single price point for charting."""
     timestamp: int  # Unix timestamp in milliseconds
-    price: float
+    price: float    # Price in ₹ (converted if USD stock)
 
 class PriceHistoryResponse(BaseModel):
     """Response schema for price history data."""
     symbol: str
     period: str
     data: List[PricePoint]
-    price_change: float
+    price_change: float             # In ₹
     price_change_percent: float
-    current_price: float
-    previous_close: float
+    current_price: float            # In ₹
+    previous_close: float           # In ₹
+    is_usd_converted: bool = False
+    usd_to_inr_rate: Optional[float] = None
 
 
 @app.get("/api/trade/history/{symbol}", response_model=PriceHistoryResponse)
@@ -1591,10 +1617,15 @@ def get_price_history(symbol: str, period: str = Query("1d", regex="^(1d|1w|1m)$
     - 1m: Last 1 month (1-day intervals)
     
     Returns list of {timestamp, price} for charting plus change statistics.
+    All prices are returned in INR (USD stocks are automatically converted).
     """
     try:
         normalized_symbol = symbol.upper().strip()
         ticker = yf.Ticker(normalized_symbol)
+        
+        # Check if this is a US stock that needs conversion
+        is_usd = is_us_stock(normalized_symbol)
+        usd_rate = get_usd_to_inr_rate() if is_usd else None
         
         # Map period to yfinance parameters
         period_map = {
@@ -1614,16 +1645,18 @@ def get_price_history(symbol: str, period: str = Query("1d", regex="^(1d|1w|1m)$
                 detail=f"No price history found for symbol '{normalized_symbol}'"
             )
         
-        # Convert to list of price points
+        # Convert to list of price points (with INR conversion if needed)
         data_points = []
         for index, row in hist.iterrows():
             timestamp_ms = int(index.timestamp() * 1000)
+            raw_price = float(row['Close'])
+            price_inr = raw_price * usd_rate if is_usd else raw_price
             data_points.append(PricePoint(
                 timestamp=timestamp_ms,
-                price=round(float(row['Close']), 2)
+                price=round(price_inr, 2)
             ))
         
-        # Calculate price change
+        # Calculate price change (already in INR)
         if len(data_points) >= 2:
             first_price = data_points[0].price
             current_price = data_points[-1].price
@@ -1635,6 +1668,9 @@ def get_price_history(symbol: str, period: str = Query("1d", regex="^(1d|1w|1m)$
             price_change_percent = 0
             first_price = current_price
         
+        if is_usd:
+            print(f"[History API] US Stock {normalized_symbol}: Converted {len(data_points)} points to INR (rate: {usd_rate})")
+        
         return PriceHistoryResponse(
             symbol=normalized_symbol,
             period=period,
@@ -1642,7 +1678,9 @@ def get_price_history(symbol: str, period: str = Query("1d", regex="^(1d|1w|1m)$
             price_change=round(price_change, 2),
             price_change_percent=round(price_change_percent, 2),
             current_price=round(current_price, 2),
-            previous_close=round(first_price, 2)
+            previous_close=round(first_price, 2),
+            is_usd_converted=is_usd,
+            usd_to_inr_rate=round(usd_rate, 2) if usd_rate else None
         )
         
     except HTTPException:
