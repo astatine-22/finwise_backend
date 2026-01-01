@@ -21,6 +21,7 @@ class User(Base):
     # Relationships
     portfolio = relationship("Portfolio", back_populates="user", uselist=False)
     achievements = relationship("UserAchievement", back_populates="user")
+    transactions = relationship("Transaction", back_populates="user")
 
 class Expense(Base):
     __tablename__ = "expenses"
@@ -139,3 +140,35 @@ class UserAchievement(Base):
     # Relationships
     user = relationship("User", back_populates="achievements")
     achievement = relationship("Achievement", back_populates="user_achievements")
+
+
+# ============================================================================
+# TRANSACTION LEDGER - Trade History
+# ============================================================================
+
+class Transaction(Base):
+    """
+    Records all buy/sell transactions for audit trail and history.
+    All monetary values are stored in Indian Rupees (₹).
+    Tracks currency conversion for US stocks and brokerage fees.
+    """
+    __tablename__ = "transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # Trade details
+    symbol = Column(String, nullable=False)           # e.g., "RELIANCE.NS", "AAPL", "BTC-INR"
+    type = Column(String, nullable=False)             # "BUY" or "SELL"
+    quantity = Column(Float, nullable=False)
+    
+    # Pricing (all in ₹)
+    price_per_share = Column(Float, nullable=False)   # In ₹ (converted if USD stock)
+    total_amount = Column(Float, nullable=False)      # price_per_share * quantity (in ₹)
+    brokerage_fee = Column(Float, nullable=False)     # 0.1% fee in ₹
+    
+    # Timestamp
+    timestamp = Column(DateTime, nullable=False)
+    
+    # Relationship
+    user = relationship("User", back_populates="transactions")

@@ -861,11 +861,14 @@ class TradeExecutionResponse(BaseModel):
     message: str
     asset_symbol: str
     quantity: float
-    executed_price: float
-    total_cost: float
+    executed_price: float          # Price per share in ₹
+    brokerage_fee: float           # 0.1% fee in ₹
+    total_cost: float              # (price * qty) + fee in ₹
     remaining_cash: float
     new_holding_quantity: float
     new_average_price: float
+    is_usd_converted: bool = False # True if USD stock was converted to INR
+    usd_to_inr_rate: Optional[float] = None  # Exchange rate used (if applicable)
 
 
 # --- Helper Function: Fetch Real-Time Price via yfinance ---
@@ -936,6 +939,98 @@ def get_or_create_portfolio(user: models.User, db: Session) -> models.Portfolio:
     db.refresh(new_portfolio)
     
     return new_portfolio
+
+
+# =============================================================================
+# TRADING ENGINE HELPER FUNCTIONS
+# =============================================================================
+
+# --- Currency Conversion Cache ---
+_usd_inr_cache = {"rate": 84.0, "timestamp": None}
+
+def get_usd_to_inr_rate() -> float:
+    """
+    Fetch USD/INR exchange rate from yfinance.
+    Caches for 5 minutes to reduce API calls. Defaults to 84.0 if fetch fails.
+    """
+    global _usd_inr_cache
+    
+    # Return cached rate if fresh (within 5 minutes)
+    if _usd_inr_cache["timestamp"]:
+        if datetime.utcnow() - _usd_inr_cache["timestamp"] < timedelta(minutes=5):
+            return _usd_inr_cache["rate"]
+    
+    try:
+        ticker = yf.Ticker("USDINR=X")
+        hist = ticker.history(period="1d")
+        if not hist.empty:
+            rate = float(hist['Close'].iloc[-1])
+            _usd_inr_cache = {"rate": rate, "timestamp": datetime.utcnow()}
+            print(f"[Trading] USD/INR rate fetched: {rate}")
+            return rate
+    except Exception as e:
+        print(f"[Trading] Error fetching USD/INR rate: {e}")
+    
+    return _usd_inr_cache["rate"]  # Return last cached or default
+
+
+def is_market_open(symbol: str) -> bool:
+    """
+    Check if the market is open for trading the given symbol.
+    
+    Rules:
+    - Indian stocks (.NS, .BO): 9:15 AM - 3:30 PM IST, weekdays only
+    - Crypto (-USD, -INR): Always open (24/7)
+    - US stocks: Allow 24/7 for paper trading simplicity
+    """
+    import pytz
+    
+    symbol_upper = symbol.upper()
+    
+    # Crypto is always open (24/7 market)
+    if "-USD" in symbol_upper or "-INR" in symbol_upper:
+        return True
+    
+    # Indian stocks - enforce NSE/BSE market hours
+    if symbol_upper.endswith(".NS") or symbol_upper.endswith(".BO"):
+        ist = pytz.timezone("Asia/Kolkata")
+        now = datetime.now(ist)
+        
+        # Check if weekday (Monday = 0, Sunday = 6)
+        if now.weekday() >= 5:  # Saturday or Sunday
+            return False
+        
+        # Check time (9:15 AM to 3:30 PM IST)
+        market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
+        market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
+        
+        return market_open <= now <= market_close
+    
+    # US stocks - allow 24/7 for paper trading (currency conversion still applies)
+    return True
+
+
+def is_us_stock(symbol: str) -> bool:
+    """
+    Determine if a symbol is a US stock (not Indian, not crypto).
+    US stocks need USD to INR conversion.
+    """
+    symbol_upper = symbol.upper()
+    
+    # Indian stock suffixes - NOT a US stock
+    if symbol_upper.endswith(".NS") or symbol_upper.endswith(".BO"):
+        return False
+    
+    # Crypto patterns - NOT a US stock
+    if "-USD" in symbol_upper or "-INR" in symbol_upper:
+        return False
+    
+    # Everything else is a US stock
+    return True
+
+
+# Brokerage fee rate (0.1%)
+BROKERAGE_FEE_RATE = 0.001
 
 
 # --- Paper Trading API Endpoints ---
@@ -1048,12 +1143,16 @@ def execute_buy_order(
     """
     POST /api/trade/buy
     
-    Executes a buy order for the specified asset:
-    1. Fetches current real-time price via yfinance
-    2. Validates user has sufficient virtual cash
-    3. Deducts cost from portfolio cash
-    4. Updates existing holding (with weighted average price) or creates new one
-    5. Returns execution confirmation
+    Executes a buy order for the specified asset with realistic trading features:
+    1. Validates market hours (Indian stocks: 9:15 AM - 3:30 PM IST weekdays)
+    2. Fetches current real-time price via yfinance
+    3. Converts USD to INR for US stocks
+    4. Calculates 0.1% brokerage fee
+    5. Validates user has sufficient virtual cash
+    6. Deducts cost + fee from portfolio cash
+    7. Updates existing holding (with weighted average price) or creates new one
+    8. Logs transaction in the Transaction ledger
+    9. Returns execution confirmation with fee details
     
     Uses proper transaction handling to ensure data integrity.
     """
@@ -1069,33 +1168,54 @@ def execute_buy_order(
     symbol = trade.asset_symbol.upper().strip()
     quantity = trade.quantity
     
-    # --- Step 1: Fetch current market price ---
-    current_price = get_current_price(symbol)
+    # --- Step 1: Validate Market Hours ---
+    if not is_market_open(symbol):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Market is Closed. Indian stocks can only be traded between 9:15 AM - 3:30 PM IST on weekdays."
+        )
     
-    if current_price is None:
+    # --- Step 2: Fetch current market price ---
+    raw_price = get_current_price(symbol)
+    
+    if raw_price is None:
         raise HTTPException(
             status_code=400, 
             detail=f"Unable to fetch price for symbol '{symbol}'. Please verify the symbol is valid (e.g., 'RELIANCE.NS' for Reliance, 'TCS.NS' for TCS, 'BTC-INR' for Bitcoin in INR)."
         )
     
-    if current_price <= 0:
+    if raw_price <= 0:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid price received for symbol '{symbol}'. Please try again."
         )
     
-    # --- Step 2: Calculate total cost and validate funds ---
-    total_cost = current_price * quantity
+    # --- Step 3: Currency Conversion (for US stocks) ---
+    is_usd = is_us_stock(symbol)
+    usd_rate = None
     
+    if is_usd:
+        usd_rate = get_usd_to_inr_rate()
+        price_inr = raw_price * usd_rate
+        print(f"[Trading] US Stock detected. Converted ${raw_price:.2f} USD → ₹{price_inr:.2f} INR (rate: {usd_rate})")
+    else:
+        price_inr = raw_price
+    
+    # --- Step 4: Calculate costs with brokerage fee ---
+    trade_value = price_inr * quantity
+    brokerage_fee = trade_value * BROKERAGE_FEE_RATE
+    total_cost = trade_value + brokerage_fee
+    
+    # --- Step 5: Validate funds ---
     if total_cost > portfolio.virtual_cash:
         raise HTTPException(
             status_code=400,
-            detail=f"Insufficient funds. Required: ₹{total_cost:,.2f}, Available: ₹{portfolio.virtual_cash:,.2f}"
+            detail=f"Insufficient funds. Required: ₹{total_cost:,.2f} (incl. ₹{brokerage_fee:.2f} brokerage), Available: ₹{portfolio.virtual_cash:,.2f}"
         )
     
-    # --- Step 3: Execute the trade (transactional) ---
+    # --- Step 6: Execute the trade (transactional) ---
     try:
-        # Deduct cash from portfolio
+        # Deduct total cost (including fee) from portfolio
         portfolio.virtual_cash -= total_cost
         
         # Check if user already owns this asset
@@ -1108,7 +1228,7 @@ def execute_buy_order(
             # --- Update existing holding with weighted average price ---
             # Formula: new_avg = (old_qty * old_avg + new_qty * new_price) / (old_qty + new_qty)
             old_value = existing_holding.quantity * existing_holding.average_buy_price
-            new_value = quantity * current_price
+            new_value = quantity * price_inr
             new_total_quantity = existing_holding.quantity + quantity
             
             new_average_price = (old_value + new_value) / new_total_quantity
@@ -1124,12 +1244,25 @@ def execute_buy_order(
                 portfolio_id=portfolio.id,
                 asset_symbol=symbol,
                 quantity=quantity,
-                average_buy_price=current_price
+                average_buy_price=price_inr
             )
             db.add(new_holding)
             
             final_quantity = quantity
-            final_avg_price = current_price
+            final_avg_price = price_inr
+        
+        # --- Step 7: Create Transaction Record ---
+        transaction = models.Transaction(
+            user_id=user.id,
+            symbol=symbol,
+            type="BUY",
+            quantity=quantity,
+            price_per_share=price_inr,
+            total_amount=trade_value,
+            brokerage_fee=brokerage_fee,
+            timestamp=datetime.utcnow()
+        )
+        db.add(transaction)
         
         # Commit the transaction
         db.commit()
@@ -1157,11 +1290,14 @@ def execute_buy_order(
             message=f"Successfully purchased {quantity} units of {symbol}",
             asset_symbol=symbol,
             quantity=quantity,
-            executed_price=round(current_price, 2),
+            executed_price=round(price_inr, 2),
+            brokerage_fee=round(brokerage_fee, 2),
             total_cost=round(total_cost, 2),
             remaining_cash=round(portfolio.virtual_cash, 2),
             new_holding_quantity=round(final_quantity, 4),
-            new_average_price=round(final_avg_price, 2)
+            new_average_price=round(final_avg_price, 2),
+            is_usd_converted=is_usd,
+            usd_to_inr_rate=round(usd_rate, 2) if usd_rate else None
         )
         
     except Exception as e:
@@ -1187,10 +1323,14 @@ class SellExecutionResponse(BaseModel):
     message: str
     asset_symbol: str
     quantity_sold: float
-    executed_price: float
-    total_proceeds: float  # Amount added to cash balance
+    executed_price: float           # Price per share in ₹
+    gross_proceeds: float           # Price × Quantity in ₹
+    brokerage_fee: float            # 0.1% fee in ₹
+    net_proceeds: float             # Amount added to cash after fee
     remaining_cash: float
-    remaining_quantity: float  # Remaining holding quantity (0 if fully sold)
+    remaining_quantity: float       # Remaining holding quantity (0 if fully sold)
+    is_usd_converted: bool = False
+    usd_to_inr_rate: Optional[float] = None
 
 
 @app.post("/api/trade/sell", response_model=SellExecutionResponse)
@@ -1198,13 +1338,17 @@ def sell_asset(request: SellRequest, db: Session = Depends(get_db)):
     """
     POST /api/trade/sell
     
-    Sells a specified quantity of an asset from the user's portfolio.
-    - Validates user owns the asset and has sufficient quantity
-    - Fetches current market price from Yahoo Finance
-    - Increases virtual cash balance by sale proceeds
-    - Updates or removes the holding
+    Sells a specified quantity of an asset from the user's portfolio with realistic trading:
+    1. Validates market hours (Indian stocks: 9:15 AM - 3:30 PM IST weekdays)
+    2. Validates user owns the asset and has sufficient quantity
+    3. Fetches current market price from Yahoo Finance
+    4. Converts USD to INR for US stocks
+    5. Calculates 0.1% brokerage fee (deducted from proceeds)
+    6. Increases virtual cash balance by net proceeds (after fee)
+    7. Updates or removes the holding
+    8. Logs transaction in the Transaction ledger
     
-    Returns execution details including proceeds and remaining position.
+    Returns execution details including proceeds, fee, and remaining position.
     """
     email = request.email.lower().strip()
     symbol = request.symbol.upper().strip()
@@ -1220,6 +1364,13 @@ def sell_asset(request: SellRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="No portfolio found. You need to buy assets first.")
     
     portfolio = user.portfolio
+    
+    # --- Validate Market Hours ---
+    if not is_market_open(symbol):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Market is Closed. Indian stocks can only be traded between 9:15 AM - 3:30 PM IST on weekdays."
+        )
     
     # Find the holding
     holding = db.query(models.Holding).filter(
@@ -1241,19 +1392,32 @@ def sell_asset(request: SellRequest, db: Session = Depends(get_db)):
         )
     
     # Get current market price
-    current_price = get_current_price(symbol)
-    if current_price is None:
+    raw_price = get_current_price(symbol)
+    if raw_price is None:
         raise HTTPException(
             status_code=503,
             detail=f"Unable to fetch current price for {symbol}. Market may be closed or symbol is invalid."
         )
     
+    # --- Currency Conversion (for US stocks) ---
+    is_usd = is_us_stock(symbol)
+    usd_rate = None
+    
+    if is_usd:
+        usd_rate = get_usd_to_inr_rate()
+        price_inr = raw_price * usd_rate
+        print(f"[Trading] US Stock sell. Converted ${raw_price:.2f} USD → ₹{price_inr:.2f} INR (rate: {usd_rate})")
+    else:
+        price_inr = raw_price
+    
     try:
-        # Calculate proceeds
-        total_proceeds = current_price * quantity
+        # --- Calculate proceeds with brokerage fee ---
+        gross_proceeds = price_inr * quantity
+        brokerage_fee = gross_proceeds * BROKERAGE_FEE_RATE
+        net_proceeds = gross_proceeds - brokerage_fee
         
-        # Update cash balance
-        portfolio.virtual_cash += total_proceeds
+        # Update cash balance (net of fee)
+        portfolio.virtual_cash += net_proceeds
         
         # Update or remove holding
         if holding.quantity == quantity:
@@ -1265,6 +1429,19 @@ def sell_asset(request: SellRequest, db: Session = Depends(get_db)):
             holding.quantity -= quantity
             remaining_quantity = holding.quantity
         
+        # --- Create Transaction Record ---
+        transaction = models.Transaction(
+            user_id=user.id,
+            symbol=symbol,
+            type="SELL",
+            quantity=quantity,
+            price_per_share=price_inr,
+            total_amount=gross_proceeds,
+            brokerage_fee=brokerage_fee,
+            timestamp=datetime.utcnow()
+        )
+        db.add(transaction)
+        
         # Commit transaction
         db.commit()
         
@@ -1272,10 +1449,14 @@ def sell_asset(request: SellRequest, db: Session = Depends(get_db)):
             message=f"Successfully sold {quantity} units of {symbol}",
             asset_symbol=symbol,
             quantity_sold=quantity,
-            executed_price=round(current_price, 2),
-            total_proceeds=round(total_proceeds, 2),
+            executed_price=round(price_inr, 2),
+            gross_proceeds=round(gross_proceeds, 2),
+            brokerage_fee=round(brokerage_fee, 2),
+            net_proceeds=round(net_proceeds, 2),
             remaining_cash=round(portfolio.virtual_cash, 2),
-            remaining_quantity=round(remaining_quantity, 4)
+            remaining_quantity=round(remaining_quantity, 4),
+            is_usd_converted=is_usd,
+            usd_to_inr_rate=round(usd_rate, 2) if usd_rate else None
         )
         
     except Exception as e:
@@ -1285,6 +1466,66 @@ def sell_asset(request: SellRequest, db: Session = Depends(get_db)):
             detail=f"Sell order failed: {str(e)}"
         )
 
+
+# --- TRANSACTION HISTORY ENDPOINT ---
+
+class TransactionResponse(BaseModel):
+    """Response schema for transaction history."""
+    id: int
+    symbol: str
+    type: str               # "BUY" or "SELL"
+    quantity: float
+    price_per_share: float  # In ₹
+    total_amount: float     # In ₹
+    brokerage_fee: float    # In ₹
+    timestamp: str          # Formatted datetime
+
+    class Config:
+        orm_mode = True
+
+
+@app.get("/api/trade/history", response_model=List[TransactionResponse])
+def get_transaction_history(email: str = Query(...), db: Session = Depends(get_db)):
+    """
+    GET /api/trade/history
+    
+    Returns the list of all transactions for the logged-in user.
+    Ordered by timestamp descending (newest first).
+    
+    Each transaction includes:
+    - Symbol traded
+    - Transaction type (BUY/SELL)
+    - Quantity
+    - Price per share (in ₹)
+    - Total amount (in ₹)
+    - Brokerage fee (in ₹)
+    - Timestamp
+    """
+    # Find user by email
+    user = db.query(models.User).filter(models.User.email == email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Fetch transactions ordered by timestamp descending
+    transactions = db.query(models.Transaction).filter(
+        models.Transaction.user_id == user.id
+    ).order_by(models.Transaction.timestamp.desc()).all()
+    
+    # Format response
+    result = []
+    for txn in transactions:
+        result.append(TransactionResponse(
+            id=txn.id,
+            symbol=txn.symbol,
+            type=txn.type,
+            quantity=txn.quantity,
+            price_per_share=round(txn.price_per_share, 2),
+            total_amount=round(txn.total_amount, 2),
+            brokerage_fee=round(txn.brokerage_fee, 2),
+            timestamp=txn.timestamp.strftime("%b %d, %Y %I:%M %p")
+        ))
+    
+    return result
 
 # --- Additional Utility Endpoint: Get Asset Price ---
 
