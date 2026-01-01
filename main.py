@@ -2226,6 +2226,26 @@ TRACKED_INDIAN_STOCKS = [
 ]
 
 
+# Popular US stocks for the US Market section
+TRACKED_US_STOCKS = [
+    ("AAPL", "Apple Inc.", "Technology"),
+    ("MSFT", "Microsoft", "Technology"),
+    ("TSLA", "Tesla", "Automobile"),
+    ("GOOGL", "Alphabet", "Technology"),
+    ("AMZN", "Amazon", "Retail"),
+    ("NVDA", "NVIDIA", "Semiconductors"),
+    ("META", "Meta Platforms", "Technology"),
+    ("NFLX", "Netflix", "Media"),
+    ("AMD", "AMD", "Semiconductors"),
+    ("DIS", "Walt Disney", "Media"),
+    ("PYPL", "PayPal", "Fintech"),
+    ("INTC", "Intel", "Semiconductors"),
+    ("CRM", "Salesforce", "Technology"),
+    ("ADBE", "Adobe", "Technology"),
+    ("V", "Visa", "Fintech"),
+]
+
+
 def fetch_stock_data(stock_info):
     """Fetch stock data for a single stock."""
     symbol, name, sector = stock_info
@@ -2309,6 +2329,80 @@ def get_top_losers():
     stocks.sort(key=lambda x: x.change_percent)  # Most negative first
     
     return StockListResponse(stocks=stocks[:10])
+
+
+# --- US STOCKS ENDPOINTS ---
+
+def fetch_us_stock_data(stock_info):
+    """
+    Fetch stock data for a single US stock.
+    Returns price in USD (no conversion to INR).
+    """
+    symbol, name, sector = stock_info
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="2d")
+        
+        if not hist.empty and len(hist) >= 1:
+            current_price = float(hist['Close'].iloc[-1])
+            prev_close = float(hist['Close'].iloc[-2]) if len(hist) >= 2 else current_price
+            change = current_price - prev_close
+            change_percent = (change / prev_close) * 100 if prev_close > 0 else 0
+            
+            return StockItem(
+                symbol=symbol,  # Keep original symbol (no .NS suffix to strip)
+                name=name,
+                sector=sector,
+                price=round(current_price, 2),  # Price in USD
+                change=round(change, 2),
+                change_percent=round(change_percent, 2),
+                is_positive=change >= 0,
+                logo_initial=name[0].upper()
+            )
+    except Exception as e:
+        print(f"Error fetching US stock {symbol}: {e}")
+    return None
+
+
+@app.get("/api/market/stocks/us", response_model=StockListResponse)
+def get_us_stocks():
+    """
+    GET /api/market/stocks/us
+    
+    Returns list of popular US stocks with current prices in USD.
+    Prices are NOT converted to INR - display with $ symbol on frontend.
+    """
+    stocks = []
+    
+    # Use ThreadPoolExecutor for parallel fetching
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(fetch_us_stock_data, TRACKED_US_STOCKS))
+    
+    stocks = [s for s in results if s is not None]
+    
+    # Sort by change percent (highest first for explore view)
+    stocks.sort(key=lambda x: abs(x.change_percent), reverse=True)
+    
+    return StockListResponse(stocks=stocks)
+
+
+@app.get("/api/market/stocks/in", response_model=StockListResponse)
+def get_indian_stocks():
+    """
+    GET /api/market/stocks/in
+    
+    Returns list of popular Indian stocks with current prices in INR.
+    Alias endpoint for /api/market/stocks.
+    """
+    stocks = []
+    
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(fetch_stock_data, TRACKED_INDIAN_STOCKS))
+    
+    stocks = [s for s in results if s is not None]
+    stocks.sort(key=lambda x: abs(x.change_percent), reverse=True)
+    
+    return StockListResponse(stocks=stocks)
 
 
 # =============================================================================
