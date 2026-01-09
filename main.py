@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -29,6 +29,50 @@ from database import engine, get_db
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+
+# =============================================================================
+# SAFE DATABASE MIGRATION (runs on startup)
+# =============================================================================
+
+def perform_safe_migration():
+    """
+    Perform safe database migrations without data loss.
+    Adds missing columns if they don't exist.
+    """
+    migration_queries = [
+        # Add hashed_password column if it doesn't exist (for legacy compatibility)
+        # Note: Our model uses 'password' which already stores hashed values
+        # This is here in case any old schema has issues
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'users' AND column_name = 'password'
+            ) THEN
+                ALTER TABLE users ADD COLUMN password VARCHAR;
+            END IF;
+        END $$;
+        """,
+    ]
+    
+    try:
+        with engine.connect() as conn:
+            for query in migration_queries:
+                conn.execute(text(query))
+            conn.commit()
+        print("✅ Safe database migration completed successfully.")
+    except Exception as e:
+        print(f"⚠️ Migration warning (may be non-critical): {e}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Run safe migrations when the server starts."""
+    print("🚀 Starting FinWise API server...")
+    perform_safe_migration()
+    print("✅ Server startup complete.")
 
 # =============================================================================
 # CORS CONFIGURATION - Cloud Ready
