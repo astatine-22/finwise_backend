@@ -296,7 +296,9 @@ class TokenResponse(BaseModel):
     """Response model for JWT token authentication."""
     access_token: str
     token_type: str = "bearer"
-    user: Optional[UserProfile] = None
+    user_id: Optional[int] = None
+    name: Optional[str] = None
+    user: Optional[UserProfile] = None  # Keep for backward compatibility with Google login
 
 
 class ProfilePictureUpdate(BaseModel):
@@ -338,7 +340,7 @@ def get_start_date_for_range(range_str: str) -> Optional[datetime]:
 # --- API ROUTES ---
 
 # 1. SIGNUP (with bcrypt password hashing)
-@app.post("/api/auth/signup", response_model=TokenResponse)
+@app.post("/api/auth/signup", response_model=SimpleResponse)
 def signup(user: SignupRequest, db: Session = Depends(get_db)):
     """Register a new user with bcrypt password hashing."""
     db_user = db.query(models.User).filter(models.User.email == user.email.lower()).first()
@@ -358,14 +360,7 @@ def signup(user: SignupRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    # Create and return JWT token
-    access_token = create_access_token(data={"sub": new_user.email})
-    
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {"name": new_user.name, "xp": new_user.xp, "profile_picture": new_user.profile_picture}
-    }
+    return {"message": "User created successfully"}
 
 # 2. NORMAL LOGIN (with bcrypt verification and JWT token)
 @app.post("/api/auth/login", response_model=TokenResponse)
@@ -391,7 +386,8 @@ def login(user: LoginRequest, db: Session = Depends(get_db)):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": {"name": db_user.name, "xp": db_user.xp, "profile_picture": db_user.profile_picture}
+        "user_id": db_user.id,
+        "name": db_user.name
     }
 
 # 3. GOOGLE LOGIN (with JWT token)
