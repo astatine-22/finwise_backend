@@ -941,33 +941,68 @@ def get_or_create_portfolio(user: models.User, db: Session) -> models.Portfolio:
 # TRADING ENGINE HELPER FUNCTIONS
 # =============================================================================
 
-# --- Currency Conversion Cache ---
-_usd_inr_cache = {"rate": 84.0, "timestamp": None}
+# --- Currency Conversion Cache (Short TTL for near real-time) ---
+_usd_inr_cache = {"rate": 87.50, "timestamp": None}
 
 def get_usd_to_inr_rate() -> float:
     """
-    Fetch USD/INR exchange rate from yfinance.
-    Caches for 5 minutes to reduce API calls. Defaults to 84.0 if fetch fails.
+    Fetch LIVE USD/INR exchange rate from yfinance.
+    
+    Uses fast_info for real-time data with a short 1-minute cache.
+    Falls back to history if fast_info fails.
+    Default fallback: 87.50 (approximate current rate).
     """
     global _usd_inr_cache
     
-    # Return cached rate if fresh (within 5 minutes)
+    # Return cached rate if fresh (within 1 minute for near real-time)
     if _usd_inr_cache["timestamp"]:
-        if datetime.utcnow() - _usd_inr_cache["timestamp"] < timedelta(minutes=5):
+        cache_age = datetime.utcnow() - _usd_inr_cache["timestamp"]
+        if cache_age < timedelta(minutes=1):
+            print(f"💵 USD/INR (cached): {_usd_inr_cache['rate']:.2f}")
             return _usd_inr_cache["rate"]
     
     try:
         ticker = yf.Ticker("USDINR=X")
-        hist = ticker.history(period="1d")
-        if not hist.empty:
-            rate = float(hist['Close'].iloc[-1])
-            _usd_inr_cache = {"rate": rate, "timestamp": datetime.utcnow()}
-            print(f"[Trading] USD/INR rate fetched: {rate}")
-            return rate
+        
+        # Method 1: Use fast_info for real-time data (fastest)
+        try:
+            info = ticker.fast_info
+            if hasattr(info, 'last_price') and info.last_price is not None:
+                rate = float(info.last_price)
+                _usd_inr_cache = {"rate": rate, "timestamp": datetime.utcnow()}
+                print(f"🔥 LIVE USD RATE: {rate:.4f} (fast_info)")
+                return rate
+        except Exception as e:
+            print(f"[USD/INR] fast_info failed: {e}")
+        
+        # Method 2: Fallback to history (slightly delayed)
+        try:
+            hist = ticker.history(period="1d", interval="1m")
+            if not hist.empty:
+                rate = float(hist['Close'].iloc[-1])
+                _usd_inr_cache = {"rate": rate, "timestamp": datetime.utcnow()}
+                print(f"🔥 LIVE USD RATE: {rate:.4f} (history fallback)")
+                return rate
+        except Exception as e:
+            print(f"[USD/INR] history failed: {e}")
+        
+        # Method 3: Try regularMarketPrice from info
+        try:
+            full_info = ticker.info
+            if 'regularMarketPrice' in full_info and full_info['regularMarketPrice']:
+                rate = float(full_info['regularMarketPrice'])
+                _usd_inr_cache = {"rate": rate, "timestamp": datetime.utcnow()}
+                print(f"🔥 LIVE USD RATE: {rate:.4f} (regularMarketPrice)")
+                return rate
+        except Exception as e:
+            print(f"[USD/INR] info failed: {e}")
+            
     except Exception as e:
-        print(f"[Trading] Error fetching USD/INR rate: {e}")
+        print(f"⚠️ USD/INR fetch error: {e}")
     
-    return _usd_inr_cache["rate"]  # Return last cached or default
+    # Return cached or default
+    print(f"⚠️ USD/INR using fallback: {_usd_inr_cache['rate']:.2f}")
+    return _usd_inr_cache["rate"]
 
 
 def is_market_open(symbol: str) -> bool:
