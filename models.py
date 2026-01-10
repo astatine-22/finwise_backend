@@ -8,7 +8,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
     email = Column(String, unique=True, index=True)
-    password = Column(String)  # Stores bcrypt hashed password, never plaintext
+    password = Column(String)  # Plain text password (college project only - NOT for production)
     xp = Column(Integer, default=0)
     has_completed_onboarding = Column(Boolean, default=False)
     profile_picture = Column(Text, nullable=True)  # Base64 encoded image

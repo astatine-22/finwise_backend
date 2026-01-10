@@ -1,0 +1,18 @@
+[33md35ae42[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Solved the signup issue 3
+[33ma48c926[m Solved the signup issue 2
+[33m152ee30[m Remove local database file from repository
+[33m2f2fb3d[m Solved the signup issue
+[33mb843a2d[m Solved the real time usd issue
+[33mcb074fb[m Added user login
+[33m2cda702[m Enhanced the backend so that it handels us to inr Converstion part 3
+[33m22011dc[m Enhanced the backend so that it handels us to inr Converstion part 2 and also the us and india seperation
+[33m7a13316[m Enhanced the backend so that it handels us to inr Converstion
+[33m847c4d0[m Remove render.yaml blueprint (requires paid plan)
+[33m5e9ab10[m Add cloud deployment config for Render/Railway
+[33m0c39843[m Changed the Bacend from Pc top cloud
+[33mea4bbe5[m changed the trade screen
+[33m00135ca[m Added leaderboard and tried to make the app offline accessible by saving the cache
+[33m6f8dbea[m Secured PAssword
+[33mf572ff6[m Added videos
+[33mcfd488b[m 2nd commit
+[33mab58af3[m first commit

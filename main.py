@@ -12,7 +12,6 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 
 # --- SECURITY IMPORTS ---
-from passlib.context import CryptContext
 from jose import JWTError, jwt
 import secrets
 
@@ -103,9 +102,6 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
-# Password Hashing Configuration
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
@@ -115,20 +111,6 @@ GOOGLE_CLIENT_ID = os.getenv(
     "GOOGLE_CLIENT_ID", 
     "783108831764-djrpp609l2rj7kch5imn32d5rb474qf7.apps.googleusercontent.com"
 )
-
-
-# =============================================================================
-# SECURITY HELPER FUNCTIONS
-# =============================================================================
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against a bcrypt hash."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """Hash a password using bcrypt."""
-    return pwd_context.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -383,21 +365,18 @@ def get_start_date_for_range(range_str: str) -> Optional[datetime]:
 
 # --- API ROUTES ---
 
-# 1. SIGNUP (with bcrypt password hashing)
+# 1. SIGNUP (plain text password for college project)
 @app.post("/api/auth/signup", response_model=SimpleResponse)
 def signup(user: SignupRequest, db: Session = Depends(get_db)):
-    """Register a new user with bcrypt password hashing."""
+    """Register a new user with plain text password storage."""
     db_user = db.query(models.User).filter(models.User.email == user.email.lower()).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Hash the password before storing
-    hashed_password = get_password_hash(user.password)
-    
     new_user = models.User(
         name=user.name,
         email=user.email.lower(),
-        password=hashed_password,  # Store bcrypt hash, not plaintext
+        password=user.password,  # Store plain text password
         xp=100
     )
     db.add(new_user)
@@ -406,10 +385,10 @@ def signup(user: SignupRequest, db: Session = Depends(get_db)):
 
     return {"message": "User created successfully"}
 
-# 2. NORMAL LOGIN (with bcrypt verification and JWT token)
+# 2. NORMAL LOGIN (plain text password verification with JWT token)
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(user: LoginRequest, db: Session = Depends(get_db)):
-    """Authenticate user with bcrypt password verification and return JWT."""
+    """Authenticate user with plain text password verification and return JWT."""
     db_user = db.query(models.User).filter(models.User.email == user.email.lower()).first()
     
     # Check if user exists
@@ -420,8 +399,8 @@ def login(user: LoginRequest, db: Session = Depends(get_db)):
     if db_user.password == "":
         raise HTTPException(status_code=400, detail="Please login with Google")
     
-    # Verify password using bcrypt
-    if not verify_password(user.password, db_user.password):
+    # Verify password using plain text comparison
+    if db_user.password != user.password:
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
     # Create and return JWT token
