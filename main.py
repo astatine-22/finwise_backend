@@ -366,6 +366,12 @@ def get_start_date_for_range(range_str: str) -> Optional[datetime]:
 
 # --- API ROUTES ---
 
+# ROOT HEALTH CHECK
+@app.get("/")
+def health_check():
+    """Root endpoint to verify the server is running."""
+    return {"status": "ok", "message": "FinWise Backend is running!"}
+
 # 1. SIGNUP (plain text password for college project)
 @app.post("/api/auth/signup", response_model=SimpleResponse)
 def signup(user: SignupRequest, db: Session = Depends(get_db)):

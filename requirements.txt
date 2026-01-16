@@ -16,6 +16,9 @@ python-dotenv
 # Stock Market Data
 yfinance
 
+# HTTP Requests
+requests
+
 # Google Authentication
 google-auth
 google-auth-oauthlib
