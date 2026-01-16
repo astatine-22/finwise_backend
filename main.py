@@ -10,6 +10,7 @@ import yfinance as yf
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import os
+import requests
 
 # --- SECURITY IMPORTS ---
 from jose import JWTError, jwt
@@ -969,11 +970,11 @@ _usd_inr_cache = {"rate": 87.50, "timestamp": None}
 
 def get_usd_to_inr_rate() -> float:
     """
-    Fetch LIVE USD/INR exchange rate from yfinance.
+    Fetch LIVE USD/INR exchange rate from a public API.
     
-    Uses fast_info for real-time data with a short 1-minute cache.
-    Falls back to history if fast_info fails.
-    Default fallback: 87.50 (approximate current rate).
+    Uses open.er-api.com for reliable exchange rates with a 1-minute cache.
+    Falls back to static rate if API fails.
+    Default fallback: 84.50 (approximate current rate).
     """
     global _usd_inr_cache
     
@@ -985,45 +986,30 @@ def get_usd_to_inr_rate() -> float:
             return _usd_inr_cache["rate"]
     
     try:
-        ticker = yf.Ticker("USDINR=X")
+        # Use open.er-api.com public API (no auth required, 1500 requests/month free)
+        response = requests.get(
+            "https://open.er-api.com/v6/latest/USD",
+            timeout=10
+        )
         
-        # Method 1: Use fast_info for real-time data (fastest)
-        try:
-            info = ticker.fast_info
-            if hasattr(info, 'last_price') and info.last_price is not None:
-                rate = float(info.last_price)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("result") == "success" and "rates" in data:
+                rate = float(data["rates"]["INR"])
                 _usd_inr_cache = {"rate": rate, "timestamp": datetime.utcnow()}
-                print(f"🔥 LIVE USD RATE: {rate:.4f} (fast_info)")
+                print(f"🔥 LIVE USD RATE: {rate:.4f} (er-api.com)")
                 return rate
-        except Exception as e:
-            print(f"[USD/INR] fast_info failed: {e}")
         
-        # Method 2: Fallback to history (slightly delayed)
-        try:
-            hist = ticker.history(period="1d", interval="1m")
-            if not hist.empty:
-                rate = float(hist['Close'].iloc[-1])
-                _usd_inr_cache = {"rate": rate, "timestamp": datetime.utcnow()}
-                print(f"🔥 LIVE USD RATE: {rate:.4f} (history fallback)")
-                return rate
-        except Exception as e:
-            print(f"[USD/INR] history failed: {e}")
-        
-        # Method 3: Try regularMarketPrice from info
-        try:
-            full_info = ticker.info
-            if 'regularMarketPrice' in full_info and full_info['regularMarketPrice']:
-                rate = float(full_info['regularMarketPrice'])
-                _usd_inr_cache = {"rate": rate, "timestamp": datetime.utcnow()}
-                print(f"🔥 LIVE USD RATE: {rate:.4f} (regularMarketPrice)")
-                return rate
-        except Exception as e:
-            print(f"[USD/INR] info failed: {e}")
+        print(f"⚠️ USD/INR API returned status: {response.status_code}")
             
+    except requests.exceptions.Timeout:
+        print("⚠️ USD/INR API timeout")
+    except requests.exceptions.RequestException as e:
+        print(f"⚠️ USD/INR API error: {e}")
     except Exception as e:
         print(f"⚠️ USD/INR fetch error: {e}")
     
-    # Return cached or default
+    # Return cached or default fallback
     print(f"⚠️ USD/INR using fallback: {_usd_inr_cache['rate']:.2f}")
     return _usd_inr_cache["rate"]
 
