@@ -1096,12 +1096,15 @@ async def get_portfolio_summary(email: str = Query(...), db: Session = Depends(g
     
     Fetches the user's complete portfolio summary including:
     - Virtual cash balance
-    - All holdings with real-time valuations
+    - All holdings with real-time valuations (converted to INR for US stocks)
     - Total portfolio value (cash + holdings)
     - Profit/loss calculations for each holding
     
     Uses async/await with ThreadPoolExecutor for non-blocking price fetches.
     If the user doesn't have a portfolio, one is created with ₹1,00,000.
+    
+    IMPORTANT: US stock prices are automatically converted from USD to INR
+    to match the INR-denominated average_buy_price stored in the database.
     """
     # Find user by email
     user = db.query(models.User).filter(models.User.email == email.lower()).first()
@@ -1110,6 +1113,9 @@ async def get_portfolio_summary(email: str = Query(...), db: Session = Depends(g
     
     # Get or create portfolio
     portfolio = get_or_create_portfolio(user, db)
+    
+    # Fetch the USD to INR rate once for all US stock conversions
+    usd_to_inr = get_usd_to_inr_rate()
     
     # Fetch all prices concurrently using asyncio.gather
     holdings = portfolio.holdings
@@ -1123,13 +1129,21 @@ async def get_portfolio_summary(email: str = Query(...), db: Session = Depends(g
     holdings_response: List[HoldingResponse] = []
     total_holdings_value = 0.0
     
-    for holding, current_price in zip(holdings, prices):
-        if current_price is not None:
-            current_value = current_price * holding.quantity
+    for holding, raw_price in zip(holdings, prices):
+        if raw_price is not None:
+            # Convert USD to INR for US stocks to match stored average_buy_price (INR)
+            if is_us_stock(holding.asset_symbol):
+                price_inr = raw_price * usd_to_inr
+                print(f"[Portfolio] US Stock {holding.asset_symbol}: ${raw_price:.2f} → ₹{price_inr:.2f}")
+            else:
+                price_inr = raw_price
+            
+            current_value = price_inr * holding.quantity
             cost_basis = holding.average_buy_price * holding.quantity
             profit_loss = current_value - cost_basis
-            profit_loss_percent = ((current_price - holding.average_buy_price) / holding.average_buy_price) * 100
+            profit_loss_percent = ((price_inr - holding.average_buy_price) / holding.average_buy_price) * 100 if holding.average_buy_price > 0 else 0.0
             total_holdings_value += current_value
+            current_price = price_inr
         else:
             # If price fetch fails, use average buy price as fallback
             current_value = holding.average_buy_price * holding.quantity
