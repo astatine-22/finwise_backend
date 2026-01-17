@@ -376,9 +376,10 @@ def health_check():
 @app.post("/api/auth/signup", response_model=SimpleResponse)
 def signup(user: SignupRequest, db: Session = Depends(get_db)):
     """Register a new user with plain text password storage."""
+    # Check if user with this email already exists
     db_user = db.query(models.User).filter(models.User.email == user.email.lower()).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status_code=400, detail="Email ID already exists")
 
     new_user = models.User(
         name=user.name,
