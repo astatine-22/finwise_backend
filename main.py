@@ -15,6 +15,7 @@ import requests
 # --- SECURITY IMPORTS ---
 from jose import JWTError, jwt
 import secrets
+from passlib.context import CryptContext
 
 # --- IMPORTS FOR GOOGLE LOGIN ---
 from google.oauth2 import id_token
@@ -102,6 +103,10 @@ app.add_middleware(
 SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production-finwise-2024")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+
+# Password hashing
+# We support "plaintext" for backward compatibility with existing users
+pwd_context = CryptContext(schemes=["bcrypt", "plaintext"], deprecated=["plaintext"])
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -372,19 +377,20 @@ def health_check():
     """Root endpoint to verify the server is running."""
     return {"status": "ok", "message": "FinWise Backend is running!"}
 
-# 1. SIGNUP (plain text password for college project)
+# 1. SIGNUP
 @app.post("/api/auth/signup", response_model=SimpleResponse)
 def signup(user: SignupRequest, db: Session = Depends(get_db)):
-    """Register a new user with plain text password storage."""
+    """Register a new user."""
     # Check if user with this email already exists
     db_user = db.query(models.User).filter(models.User.email == user.email.lower()).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email ID already exists")
 
+    hashed_password = pwd_context.hash(user.password)
     new_user = models.User(
         name=user.name,
         email=user.email.lower(),
-        password=user.password,  # Store plain text password
+        password=hashed_password,
         xp=100
     )
     db.add(new_user)
@@ -393,10 +399,10 @@ def signup(user: SignupRequest, db: Session = Depends(get_db)):
 
     return {"message": "User created successfully"}
 
-# 2. NORMAL LOGIN (plain text password verification with JWT token)
+# 2. NORMAL LOGIN (with password verification)
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(user: LoginRequest, db: Session = Depends(get_db)):
-    """Authenticate user with plain text password verification and return JWT."""
+    """Authenticate user and return JWT."""
     db_user = db.query(models.User).filter(models.User.email == user.email.lower()).first()
     
     # Check if user exists
@@ -404,12 +410,17 @@ def login(user: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid email or password")
     
     # Check if this is a Google-only account (empty password)
-    if db_user.password == "":
+    if not db_user.password:
         raise HTTPException(status_code=400, detail="Please login with Google")
     
-    # Verify password using plain text comparison
-    if db_user.password != user.password:
+    # Verify password
+    if not pwd_context.verify(user.password, db_user.password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
+
+    # Check if password needs an update (e.g. if it was plaintext)
+    if pwd_context.needs_update(db_user.password):
+        db_user.password = pwd_context.hash(user.password)
+        db.commit()
 
     # Create and return JWT token
     access_token = create_access_token(data={"sub": db_user.email})
