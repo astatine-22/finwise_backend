@@ -13,3 +13,4 @@ google-auth-httplib2
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
+bcrypt==4.0.1
