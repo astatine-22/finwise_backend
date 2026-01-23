@@ -678,6 +678,12 @@ class LearnVideoResponse(BaseModel):
         orm_mode = True
 
 
+class LessonCompleteRequest(BaseModel):
+    """Request model for completing a lesson and earning XP."""
+    email: str
+    video_id: int
+
+
 # --- Learn Module API Endpoints ---
 
 @app.get("/api/learn/videos", response_model=List[LearnVideoResponse])
@@ -843,6 +849,31 @@ def seed_learn_videos(db: Session = Depends(get_db)):
     db.commit()
     
     return {"message": f"Successfully seeded {len(seed_videos)} educational videos!"}
+
+
+@app.post("/api/learn/complete", response_model=SimpleResponse)
+def complete_lesson(request: LessonCompleteRequest, db: Session = Depends(get_db)):
+    """
+    POST /api/learn/complete
+    
+    Rewards the user with 100 XP when they complete a lesson.
+    Also updates their activity streak for gamification.
+    """
+    # Find the user by email
+    user = db.query(models.User).filter(models.User.email == request.email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Award XP
+    user.xp = (user.xp or 0) + 100
+    
+    # Update streak for gamification
+    update_user_streak(user, db)
+    
+    # Commit changes
+    db.commit()
+    
+    return {"message": "Lesson completed! +100 XP earned."}
 
 
 # ============================================================================
