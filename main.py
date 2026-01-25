@@ -753,10 +753,10 @@ def delete_all_expenses_for_user(
     email: str = Query(..., description="User email to delete all expenses for"),
     db: Session = Depends(get_db)
 ):
-    ""\"
+    """
     DEBUG endpoint to delete ALL expenses for a specific user.
     Use this to clear test data or start fresh.
-    ""\"
+    """
     user = db.query(models.User).filter(models.User.email == email.lower()).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
