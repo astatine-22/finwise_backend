@@ -674,7 +674,7 @@ def delete_expense(expense_id: int, db: Session = Depends(get_db)):
 @app.delete("/api/debug/cleanup-duplicates", response_model=SimpleResponse)
 def cleanup_duplicate_expenses(
     email: str = Query(..., description="User email to clean up duplicates for"),
-    db: Session = Depends(get_db)
+    ignore_date: bool = Query(False, description="If True, ignores date and only checks title, amount, category"),
 ):
     """
     Maintenance endpoint to remove duplicate expenses for a specific user.
@@ -707,17 +707,25 @@ def cleanup_duplicate_expenses(
     duplicates_to_delete = []
     
     for expense in expenses:
-        # Create a signature with timestamp rounded to 60-second buckets
-        # This catches double-clicks and rapid duplicate submissions
-        expense_timestamp = expense.date.timestamp() if expense.date else 0
-        time_bucket = int(expense_timestamp // 60)  # 60-second buckets
-        
-        signature = (
-            expense.title.strip().lower(),
-            float(expense.amount),
-            expense.category.strip().lower(),
-            time_bucket  # Time rounded to nearest minute
-        )
+        if ignore_date:
+            # Ignore date completely - only check title, amount, category
+            signature = (
+                expense.title.strip().lower(),
+                float(expense.amount),
+                expense.category.strip().lower()
+            )
+        else:
+            # Create a signature with timestamp rounded to 60-second buckets
+            # This catches double-clicks and rapid duplicate submissions
+            expense_timestamp = expense.date.timestamp() if expense.date else 0
+            time_bucket = int(expense_timestamp // 60)  # 60-second buckets
+            
+            signature = (
+                expense.title.strip().lower(),
+                float(expense.amount),
+                expense.category.strip().lower(),
+                time_bucket  # Time rounded to nearest minute
+            )
         
         if signature in seen:
             # This is a duplicate - mark it for deletion
