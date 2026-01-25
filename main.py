@@ -667,6 +667,81 @@ def delete_expense(expense_id: int, db: Session = Depends(get_db)):
 
 # ---------------------------
 
+# =============================================================================
+# DEBUG/MAINTENANCE ENDPOINTS
+# =============================================================================
+
+@app.delete("/api/debug/cleanup-duplicates", response_model=SimpleResponse)
+def cleanup_duplicate_expenses(
+    email: str = Query(..., description="User email to clean up duplicates for"),
+    db: Session = Depends(get_db)
+):
+    """
+    Maintenance endpoint to remove duplicate expenses for a specific user.
+    
+    Duplicates are identified by matching:
+    - title (exact match)
+    - amount (exact match)
+    - category (exact match)
+    - date (within 60 seconds tolerance to catch double-clicks)
+    
+    Keeps the first occurrence (lowest ID) and deletes all subsequent duplicates.
+    """
+    # Find the user
+    user = db.query(models.User).filter(models.User.email == email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Fetch all expenses for this user, ordered by ID ascending
+    expenses = db.query(models.Expense).filter(
+        models.Expense.user_id == user.id
+    ).order_by(models.Expense.id.asc()).all()
+    
+    original_count = len(expenses)
+    
+    if original_count == 0:
+        return {"message": "No expenses found for this user."}
+    
+    # Track which expenses we've seen and which are duplicates
+    seen = {}  # signature -> first expense object
+    duplicates_to_delete = []
+    
+    for expense in expenses:
+        # Create a signature with timestamp rounded to 60-second buckets
+        # This catches double-clicks and rapid duplicate submissions
+        expense_timestamp = expense.date.timestamp() if expense.date else 0
+        time_bucket = int(expense_timestamp // 60)  # 60-second buckets
+        
+        signature = (
+            expense.title.strip().lower(),
+            float(expense.amount),
+            expense.category.strip().lower(),
+            time_bucket  # Time rounded to nearest minute
+        )
+        
+        if signature in seen:
+            # This is a duplicate - mark it for deletion
+            duplicates_to_delete.append(expense)
+        else:
+            # First time seeing this signature - keep it
+            seen[signature] = expense
+    
+    # Delete all duplicates
+    deleted_count = 0
+    for duplicate in duplicates_to_delete:
+        db.delete(duplicate)
+        deleted_count += 1
+    
+    db.commit()
+    
+    remaining_count = original_count - deleted_count
+    
+    return {
+        "message": f"Found {original_count} expenses. Removed {deleted_count} duplicates. {remaining_count} expenses remaining."
+    }
+
+# ---------------------------
+
 
 # ============================================================================
 # LEARN MODULE - Educational Video Content
