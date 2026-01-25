@@ -676,8 +676,8 @@ def cleanup_duplicate_expenses(
     email: str = Query(..., description="User email to clean up duplicates for"),
     ignore_date: bool = Query(False, description="If True, ignores date and only checks title, amount, category"),
     db: Session = Depends(get_db)
+):
     """
-    Maintenance endpoint to remove duplicate expenses for a specific user.
     
     Duplicates are identified by matching:
     - title (exact match)
