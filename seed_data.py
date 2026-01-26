@@ -365,6 +365,12 @@ def reset_and_seed(db):
         {"title": "Emergency Fund Guide", "url": "https://www.youtube.com/watch?v=9L9I_K2kFkI", "cat": "Module 3: Personal Finance", "dur": 8},
         {"title": "Credit Cards 101", "url": "https://www.youtube.com/watch?v=4j2emMn7UaI", "cat": "Module 3: Personal Finance", "dur": 12},
         {"title": "Income Tax Basics", "url": "https://www.youtube.com/watch?v=b8_9j6kHh9I", "cat": "Module 3: Personal Finance", "dur": 15},
+
+        # --- MODULE 4: CRYPTOCURRENCY ---
+        {"title": "Bitcoin for Beginners", "url": "https://www.youtube.com/watch?v=s4g1XFU8Gto", "cat": "Module 4: Cryptocurrency", "dur": 12},
+        {"title": "What is Blockchain?", "url": "https://www.youtube.com/watch?v=SSo_EIwHSd4", "cat": "Module 4: Cryptocurrency", "dur": 14},
+        {"title": "Crypto vs Stocks", "url": "https://www.youtube.com/watch?v=1YyAzVmP9xM", "cat": "Module 4: Cryptocurrency", "dur": 10},
+        {"title": "How to Buy Crypto Safe", "url": "https://www.youtube.com/watch?v=LcJPd5wJ7Zk", "cat": "Module 4: Cryptocurrency", "dur": 16},
     ]
 
     count = 0
