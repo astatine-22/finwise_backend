@@ -334,6 +334,7 @@ def seed_professional_course(db):
 def reset_and_seed(db):
     """
     HARD RESET: Deletes all Learn/Quiz data and reseeds with verified content.
+    Now uses Full YouTube URLs for easier data entry.
     """
     print("⚠️  STARTING HARD RESET OF LEARN CONTENT...")
     
@@ -345,31 +346,37 @@ def reset_and_seed(db):
     db.commit()
     print(f"🗑️  Deleted {deleted_q} questions, {deleted_quiz} quizzes, {deleted_v} videos.")
 
-    # 2. Reseed with VERIFIED IDs
+    # 2. Reseed with VERIFIED Full URLs
     verified_videos = [
-        # --- BASICS ---
-        {"title": "Stock Market for Beginners", "id": "p7HKvqRI_Bo", "cat": "Module 1: Basics", "dur": 15},
-        {"title": "Basics of Stock Market", "id": "p7HKvqRI_Bo", "cat": "Module 1: Basics", "dur": 12},
-        {"title": "How to Buy Stocks", "id": "bTvx6c2Yy1k", "cat": "Module 1: Basics", "dur": 14},
+        # --- MODULE 1: STOCK MARKET BASICS ---
+        {"title": "How the Stock Market Works", "url": "https://www.youtube.com/watch?v=p7HKvqRI_Bo", "cat": "Module 1: Stock Market Basics", "dur": 15},
+        {"title": "What is the Stock Market?", "url": "https://www.youtube.com/watch?v=ZCFkWDdmXG8", "cat": "Module 1: Stock Market Basics", "dur": 12},
+        {"title": "Buying Your First Stock", "url": "https://www.youtube.com/watch?v=bTvx6c2Yy1k", "cat": "Module 1: Stock Market Basics", "dur": 14},
+        {"title": "Investing for Beginners", "url": "https://www.youtube.com/watch?v=i5qUq7E-PUQ", "cat": "Module 1: Stock Market Basics", "dur": 18},
         
-        # --- MUTUAL FUNDS ---
-        {"title": "Mutual Funds Explained", "id": "tRC5aQ7sMhQ", "cat": "Module 2: Mutual Funds", "dur": 15},
-        {"title": "What is SIP?", "id": "ImZz4R5p_6c", "cat": "Module 2: Mutual Funds", "dur": 10},
-        {"title": "Power of Compounding", "id": "6mIbI17p_kU", "cat": "Module 2: Mutual Funds", "dur": 8},
+        # --- MODULE 2: MUTUAL FUNDS ---
+        {"title": "Mutual Funds Explained", "url": "https://www.youtube.com/watch?v=tRC5aQ7sMhQ", "cat": "Module 2: Mutual Funds", "dur": 15},
+        {"title": "SIP vs Lumpsum", "url": "https://www.youtube.com/watch?v=ImZz4R5p_6c", "cat": "Module 2: Mutual Funds", "dur": 10},
+        {"title": "Power of Compounding", "url": "https://www.youtube.com/watch?v=6mIbI17p_kU", "cat": "Module 2: Mutual Funds", "dur": 8},
+        {"title": "Index Funds vs Mutual Funds", "url": "https://www.youtube.com/watch?v=H9eIgnC60b0", "cat": "Module 2: Mutual Funds", "dur": 13},
 
-        # --- FINANCE ---
-        {"title": "50/30/20 Rule", "id": "s3EtjSg_bF4", "cat": "Module 3: Personal Finance", "dur": 10},
-        {"title": "Emergency Fund Guide", "id": "9L9I_K2kFkI", "cat": "Module 3: Personal Finance", "dur": 8},
-        {"title": "Credit Cards 101", "id": "4j2emMn7UaI", "cat": "Module 3: Personal Finance", "dur": 12},
+        # --- MODULE 3: PERSONAL FINANCE ---
+        {"title": "50/30/20 Budget Rule", "url": "https://www.youtube.com/watch?v=s3EtjSg_bF4", "cat": "Module 3: Personal Finance", "dur": 10},
+        {"title": "Emergency Fund Guide", "url": "https://www.youtube.com/watch?v=9L9I_K2kFkI", "cat": "Module 3: Personal Finance", "dur": 8},
+        {"title": "Credit Cards 101", "url": "https://www.youtube.com/watch?v=4j2emMn7UaI", "cat": "Module 3: Personal Finance", "dur": 12},
+        {"title": "Income Tax Basics", "url": "https://www.youtube.com/watch?v=b8_9j6kHh9I", "cat": "Module 3: Personal Finance", "dur": 15},
     ]
 
     count = 0
     for v_data in verified_videos:
+        # Extract video ID from URL for thumbnail generation
+        video_id = v_data["url"].split("v=")[1].split("&")[0] if "v=" in v_data["url"] else ""
+        
         video = models.LearnVideo(
             title=v_data["title"],
             description=f"Learn about {v_data['title']}",
-            thumbnail_url=f"https://img.youtube.com/vi/{v_data['id']}/hqdefault.jpg",
-            youtube_video_id=v_data["id"],
+            thumbnail_url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
+            youtube_video_id=v_data["url"],  # Store full URL here
             category=v_data["cat"],
             duration_minutes=v_data["dur"],
             is_featured=True,
@@ -385,11 +392,11 @@ def reset_and_seed(db):
 
         # Add generic questions
         questions = [
-            models.QuizQuestion(quiz_id=quiz.id, question_text=f"Topic of {video.title}?", option_a="Finance", option_b="Art", option_c="Music", option_d="Dance", correct_option="A", xp_value=10),
-            models.QuizQuestion(quiz_id=quiz.id, question_text="True or False?", option_a="True", option_b="False", option_c="Maybe", option_d="Unknown", correct_option="A", xp_value=10),
-            models.QuizQuestion(quiz_id=quiz.id, question_text="Best Strategy?", option_a="Invest", option_b="Spend", option_c="Hide money", option_d="Sleep", correct_option="A", xp_value=10),
-            models.QuizQuestion(quiz_id=quiz.id, question_text="Risk Level?", option_a="Medium", option_b="None", option_c="Extreme", option_d="Infinite", correct_option="A", xp_value=10),
-            models.QuizQuestion(quiz_id=quiz.id, question_text="XP Reward?", option_a="10 XP", option_b="0 XP", option_c="5 XP", option_d="1 XP", correct_option="A", xp_value=10),
+            models.QuizQuestion(quiz_id=quiz.id, question_text=f"What is the main topic of {video.title}?", option_a="Finance", option_b="Art", option_c="Music", option_d="Dance", correct_option="A", xp_value=10),
+            models.QuizQuestion(quiz_id=quiz.id, question_text="Which strategy helps build wealth?", option_a="Consistent investing", option_b="Gambling", option_c="Hoarding cash", option_d="Avoiding markets", correct_option="A", xp_value=10),
+            models.QuizQuestion(quiz_id=quiz.id, question_text="What is the benefit of starting early?", option_a="Compound growth", option_b="Higher taxes", option_c="More debt", option_d="Less savings", correct_option="A", xp_value=10),
+            models.QuizQuestion(quiz_id=quiz.id, question_text="What should you prioritize?", option_a="Emergency fund", option_b="Luxury purchases", option_c="Risky bets", option_d="Ignoring budgets", correct_option="A", xp_value=10),
+            models.QuizQuestion(quiz_id=quiz.id, question_text="How much XP for this quiz?", option_a="50 XP", option_b="0 XP", option_c="5 XP", option_d="1 XP", correct_option="A", xp_value=10),
         ]
         for q in questions:
             db.add(q)
@@ -397,7 +404,7 @@ def reset_and_seed(db):
         count += 1
     
     db.commit()
-    print(f"✅ HARD RESET COMPLETE. Seeded {count} videos.")
+    print(f"✅ HARD RESET COMPLETE. Seeded {count} videos with full URLs.")
 
 
 if __name__ == "__main__":
