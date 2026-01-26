@@ -349,7 +349,7 @@ def reset_and_seed(db):
     verified_videos = [
         # --- BASICS ---
         {"title": "Stock Market for Beginners", "id": "p7HKvqRI_Bo", "cat": "Module 1: Basics", "dur": 15},
-        {"title": "Basics of Stock Market", "id": "ZCFkWDdmXG8", "cat": "Module 1: Basics", "dur": 12},
+        {"title": "Basics of Stock Market", "id": "p7HKvqRI_Bo", "cat": "Module 1: Basics", "dur": 12},
         {"title": "How to Buy Stocks", "id": "bTvx6c2Yy1k", "cat": "Module 1: Basics", "dur": 14},
         
         # --- MUTUAL FUNDS ---
