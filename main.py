@@ -812,6 +812,19 @@ def get_learn_categories(db: Session = Depends(get_db)):
     return [cat[0] for cat in categories]
 
 
+@app.post("/api/learn/reset-db", response_model=SimpleResponse)
+def reset_learn_db(db: Session = Depends(get_db)):
+    """
+    Triggers a HARD RESET of the learn content.
+    """
+    import seed_data
+    try:
+        seed_data.reset_and_seed(db)
+        return {"message": "Database reset and seeded successfully!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/learn/seed", response_model=SimpleResponse)
 def seed_learn_videos(db: Session = Depends(get_db)):
     """
