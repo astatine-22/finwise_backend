@@ -126,215 +126,119 @@ def seed_professional_course(db):
     Seed valid professional finance course data.
     Structure: 3 Modules x 4 Videos = 12 Videos.
     """
-    # Check if videos already exist
-    existing_videos = db.query(models.LearnVideo).all()
-    
-    if existing_videos:
-        print(f"Found {len(existing_videos)} existing videos. Checking for missing quizzes...")
-        quiz_count = 0
-        for video in existing_videos:
-            # Check if likely a professional course video (has title Module...) or just any video
-            # We will add quiz to ALL videos for now to be safe
-            
-            existing_quiz = db.query(models.Quiz).filter_by(video_id=video.id).first()
-            if not existing_quiz:
-                 # Create Quiz for this video
-                quiz = models.Quiz(
-                    title=f"Quiz: {video.title}",
-                    video_id=video.id
-                )
-                db.add(quiz)
-                db.flush()
-
-                # Create 5 Questions
-                questions = [
-                    models.QuizQuestion(
-                        quiz_id=quiz.id,
-                        question_text=f"What is the main topic of {video.title}?",
-                        option_a="Finance",
-                        option_b="Cooking",
-                        option_c="Sports",
-                        option_d="Music",
-                        correct_option="A",
-                        xp_value=10
-                    ),
-                    models.QuizQuestion(
-                        quiz_id=quiz.id,
-                        question_text="Concept Check: True or False?",
-                        option_a="True",
-                        option_b="False",
-                        option_c="Maybe",
-                        option_d="Unknown",
-                        correct_option="A",
-                        xp_value=10
-                    ),
-                    models.QuizQuestion(
-                        quiz_id=quiz.id,
-                        question_text="Select the correct statement:",
-                        option_a="Investing grows wealth",
-                        option_b="Saving is useless",
-                        option_c="Debt is good",
-                        option_d="Spend everything",
-                        correct_option="A",
-                        xp_value=10
-                    ),
-                     models.QuizQuestion(
-                        quiz_id=quiz.id,
-                        question_text="Key takeaway from this lesson?",
-                        option_a="Start early",
-                        option_b="Wait for luck",
-                        option_c="Avoid money",
-                        option_d="None of the above",
-                        correct_option="A",
-                        xp_value=10
-                    ),
-                     models.QuizQuestion(
-                        quiz_id=quiz.id,
-                        question_text="How much XP is this worth?",
-                        option_a="10 XP",
-                        option_b="0 XP",
-                        option_c="100 XP",
-                        option_d="50 XP",
-                        correct_option="A",
-                        xp_value=10
-                    )
-                ]
-                for q in questions:
-                    db.add(q)
-                quiz_count += 1
-        
-        if quiz_count > 0:
-            db.commit()
-            print(f"✅ Retroactively seeded {quiz_count} missing quizzes for existing videos!")
-        else:
-            print("All videos already have quizzes.")
-        return
-
-    print("Seeding professional finance course content...")
+    print("Checking and seeding professional finance course content...")
 
     videos_data = [
-        # --- MODULE 1: STOCK MARKET BASICS ---
+        # --- MODULE 1: BASICS ---
         {
-            "title": "Module 1: How the Stock Market Works",
-            "description": "A comprehensive introduction to the stock market, exchanges (NSE/BSE), and how shares are traded.",
-            "thumbnail_url": "https://img.youtube.com/vi/p7HKvqRI_Bo/hqdefault.jpg",
-            "youtube_video_id": "p7HKvqRI_Bo",
-            "category": "Stock Market Basics",
+            "title": "Stock Market for Beginners",
+            "description": "Complete guide to understanding the stock market basics.",
+            "youtube_video_id": "3UQDtJXX0z0",
+            "category": "Module 1: Basics",
             "duration_minutes": 15,
             "is_featured": True,
             "order_index": 1
         },
         {
-            "title": "Module 1: Bull vs Bear Markets Explained",
-            "description": "Understand market cycles. What defines a Bull market versus a Bear market and how to invest in each.",
-            "thumbnail_url": "https://img.youtube.com/vi/gvZSpET11ZY/hqdefault.jpg",
-            "youtube_video_id": "gvZSpET11ZY",
-            "category": "Stock Market Basics",
+            "title": "What is Sensex & Nifty?",
+            "description": "Understanding the major Indian stock market indices.",
+            "youtube_video_id": "81bd99F6H8A",
+            "category": "Module 1: Basics",
             "duration_minutes": 12,
             "is_featured": False,
             "order_index": 2
         },
         {
-            "title": "Module 1: Market Capitalization Types",
-            "description": "Large-cap, Mid-cap, and Small-cap stocks explained. Learn the risk and reward profile of each category.",
-            "thumbnail_url": "https://img.youtube.com/vi/b11Vrdw_3uU/hqdefault.jpg",
-            "youtube_video_id": "b11Vrdw_3uU",
-            "category": "Stock Market Basics",
+            "title": "What is a Demat Account?",
+            "description": "Why you need a Demat account and how to open one.",
+            "youtube_video_id": "fJ9w9aY5m0c",
+            "category": "Module 1: Basics",
             "duration_minutes": 10,
             "is_featured": False,
             "order_index": 3
         },
         {
-            "title": "Module 1: Fundamental vs Technical Analysis",
-            "description": "The difference between analyzing company fundamentals vs reading chart patterns for trading.",
-            "thumbnail_url": "https://img.youtube.com/vi/Xn7KWR9EOGQ/hqdefault.jpg",
-            "youtube_video_id": "Xn7KWR9EOGQ",
-            "category": "Stock Market Basics",
-            "duration_minutes": 18,
+            "title": "How to Buy First Share",
+            "description": "Step-by-step guide to buying your first stock in India.",
+            "youtube_video_id": "Xn7Kk9sP0LM",
+            "category": "Module 1: Basics",
+            "duration_minutes": 14,
             "is_featured": True,
             "order_index": 4
         },
 
-        # --- MODULE 2: MUTUAL FUNDS & SIPs ---
+        # --- MODULE 2: MUTUAL FUNDS ---
         {
-            "title": "Module 2: Mutual Funds for Beginners",
-            "description": "What are Mutual Funds? How they pool money from investors to buy a basket of securities.",
-            "thumbnail_url": "https://img.youtube.com/vi/UZgRHNvOXFk/hqdefault.jpg",
-            "youtube_video_id": "UZgRHNvOXFk",
-            "category": "Mutual Funds & SIPs",
-            "duration_minutes": 14,
+            "title": "Mutual Funds Explained",
+            "description": "What are mutual funds and how do they work?",
+            "youtube_video_id": "tRC5aQ7sMhQ",
+            "category": "Module 2: Mutual Funds",
+            "duration_minutes": 15,
             "is_featured": True,
             "order_index": 5
         },
         {
-            "title": "Module 2: Power of Compounding (SIP)",
-            "description": "See the magic of compound interest with Systematic Investment Plans (SIP) over the long term.",
-            "thumbnail_url": "https://img.youtube.com/vi/Xr3lBXPWw30/hqdefault.jpg",
-            "youtube_video_id": "Xr3lBXPWw30",
-            "category": "Mutual Funds & SIPs",
-            "duration_minutes": 11,
+            "title": "SIP vs Lumpsum",
+            "description": "Which investment strategy is better for you?",
+            "youtube_video_id": "Uz2eJ6fWqkE",
+            "category": "Module 2: Mutual Funds",
+            "duration_minutes": 10,
             "is_featured": False,
             "order_index": 6
         },
         {
-            "title": "Module 2: Active vs Passive Funds",
-            "description": "Should you pay for a fund manager or buy the index? Analyzing expense ratios and performance.",
-            "thumbnail_url": "https://img.youtube.com/vi/fvGLnthJDsg/hqdefault.jpg",
-            "youtube_video_id": "fvGLnthJDsg",
-            "category": "Mutual Funds & SIPs",
-            "duration_minutes": 16,
+            "title": "Power of Compounding",
+            "description": "How compound interest makes you rich over time.",
+            "youtube_video_id": "g-7pM_y9j5s",
+            "category": "Module 2: Mutual Funds",
+            "duration_minutes": 8,
             "is_featured": False,
             "order_index": 7
         },
         {
-            "title": "Module 2: How to Choose a Mutual Fund",
-            "description": "A checklist for selecting the right mutual fund based on your goals, risk tolerance, and time horizon.",
-            "thumbnail_url": "https://img.youtube.com/vi/RkyXOH6laXA/hqdefault.jpg",
-            "youtube_video_id": "RkyXOH6laXA",
-            "category": "Mutual Funds & SIPs",
-            "duration_minutes": 13,
+            "title": "Best Mutual Funds",
+            "description": "How to select the best mutual funds for your portfolio.",
+            "youtube_video_id": "Q7_fF2J9_nE",
+            "category": "Module 2: Mutual Funds",
+            "duration_minutes": 12,
             "is_featured": False,
             "order_index": 8
         },
 
-        # --- MODULE 3: TAX & FINANCIAL PLANNING ---
+        # --- MODULE 3: PERSONAL FINANCE ---
         {
-            "title": "Module 3: Income Tax Basics (Old vs New)",
-            "description": "Understanding the Indian Income Tax slabs and the difference between the Old and New tax regimes.",
-            "thumbnail_url": "https://img.youtube.com/vi/BjpGmqo7z1A/hqdefault.jpg",
-            "youtube_video_id": "BjpGmqo7z1A",
-            "category": "Tax & Financial Planning",
-            "duration_minutes": 20,
+            "title": "50/30/20 Rule",
+            "description": "The golden rule of budgeting explained.",
+            "youtube_video_id": "s3EtjSg_bF4",
+            "category": "Module 3: Personal Finance",
+            "duration_minutes": 10,
             "is_featured": True,
             "order_index": 9
         },
         {
-            "title": "Module 3: Tax Saving via Section 80C",
-            "description": "How to save tax legally using PPF, ELSS, EPF, and other instruments under Section 80C.",
-            "thumbnail_url": "https://img.youtube.com/vi/1BYs84vegLk/hqdefault.jpg",
-            "youtube_video_id": "1BYs84vegLk",
-            "category": "Tax & Financial Planning",
-            "duration_minutes": 15,
+            "title": "Emergency Fund Guide",
+            "description": "Why and how to build an emergency fund.",
+            "youtube_video_id": "9L9I_K2kFkI",
+            "category": "Module 3: Personal Finance",
+            "duration_minutes": 8,
             "is_featured": False,
             "order_index": 10
         },
         {
-            "title": "Module 3: Why You Need Health Insurance",
-            "description": "Financial planning isn't just about investing; it's about protection. Importance of health and term insurance.",
-            "thumbnail_url": "https://img.youtube.com/vi/uB_YqwqK_hE/hqdefault.jpg",
-            "youtube_video_id": "uB_YqwqK_hE",
-            "category": "Tax & Financial Planning",
+            "title": "Credit Cards 101",
+            "description": "How to use credit cards wisely and build credit score.",
+            "youtube_video_id": "4j2emMn7UaI",
+            "category": "Module 3: Personal Finance",
             "duration_minutes": 12,
             "is_featured": False,
             "order_index": 11
         },
         {
-            "title": "Module 3: Retirement Planning 101",
-            "description": "How to calculate your retirement corpus and start planning for your golden years early.",
-            "thumbnail_url": "https://img.youtube.com/vi/Gj3sQhD_M-4/hqdefault.jpg",
-            "youtube_video_id": "Gj3sQhD_M-4",
-            "category": "Tax & Financial Planning",
-            "duration_minutes": 14,
+            "title": "Income Tax Basics",
+            "description": "Understanding income tax slabs and planning.",
+            "youtube_video_id": "b8_9j6kHh9I",
+            "category": "Module 3: Personal Finance",
+            "duration_minutes": 15,
             "is_featured": True,
             "order_index": 12
         }
@@ -342,79 +246,89 @@ def seed_professional_course(db):
 
     count = 0
     for video_data in videos_data:
-        video = models.LearnVideo(**video_data)
-        db.add(video)
-        db.flush() # Flush to get video.id
-
-        # Create a Quiz for this video
-        quiz = models.Quiz(
-            title=f"Quiz: {video.title}",
-            video_id=video.id
-        )
-        db.add(quiz)
-        db.flush() # Flush to get quiz.id
-
-        # Create 5 Questions for this quiz
-        questions = [
-            models.QuizQuestion(
-                quiz_id=quiz.id,
-                question_text=f"What is the main topic of {video.title}?",
-                option_a="Finance",
-                option_b="Cooking",
-                option_c="Sports",
-                option_d="Music",
-                correct_option="A",
-                xp_value=10
-            ),
-            models.QuizQuestion(
-                quiz_id=quiz.id,
-                question_text="Which concept was discussed?",
-                option_a="Key Financial Concept",
-                option_b="Irrelevant Detail",
-                option_c="Wrong Fact",
-                option_d="Another Wrong Fact",
-                correct_option="A",
-                xp_value=10
-            ),
-            models.QuizQuestion(
-                quiz_id=quiz.id,
-                question_text="True or False: This is important for investors.",
-                option_a="True",
-                option_b="False",
-                option_c="Maybe",
-                option_d="Unknown",
-                correct_option="A",
-                xp_value=10
-            ),
-             models.QuizQuestion(
-                quiz_id=quiz.id,
-                question_text="What is the best approach mentioned?",
-                option_a="Long-term consistency",
-                option_b="Gambling",
-                option_c="Ignoring data",
-                option_d="Panic selling",
-                correct_option="A",
-                xp_value=10
-            ),
-             models.QuizQuestion(
-                quiz_id=quiz.id,
-                question_text="How does this help your portfolio?",
-                option_a="Reduces risk / Increases growth",
-                option_b="Guarantees loss",
-                option_c="No impact",
-                option_d="Increases fees only",
-                correct_option="A",
-                xp_value=10
-            )
-        ]
+        # Check if video exists by ID
+        existing_video = db.query(models.LearnVideo).filter_by(youtube_video_id=video_data["youtube_video_id"]).first()
         
-        for q in questions:
-            db.add(q)
+        if not existing_video:
+            # Generate thumbnail URL
+            video_data["thumbnail_url"] = f"https://img.youtube.com/vi/{video_data['youtube_video_id']}/hqdefault.jpg"
             
-        count += 1
+            video = models.LearnVideo(**video_data)
+            db.add(video)
+            db.flush() # Flush to get video.id
+
+            # Create a Quiz for this video
+            quiz = models.Quiz(
+                title=f"Quiz: {video.title}",
+                video_id=video.id
+            )
+            db.add(quiz)
+            db.flush() # Flush to get quiz.id
+
+            # Create 5 Questions for this quiz
+            questions = [
+                models.QuizQuestion(
+                    quiz_id=quiz.id,
+                    question_text=f"What is the main topic of {video.title}?",
+                    option_a="Finance",
+                    option_b="Cooking",
+                    option_c="Sports",
+                    option_d="Music",
+                    correct_option="A",
+                    xp_value=10
+                ),
+                models.QuizQuestion(
+                    quiz_id=quiz.id,
+                    question_text="Concept Check: True or False?",
+                    option_a="True",
+                    option_b="False",
+                    option_c="Maybe",
+                    option_d="Unknown",
+                    correct_option="A",
+                    xp_value=10
+                ),
+                models.QuizQuestion(
+                    quiz_id=quiz.id,
+                    question_text="Select the correct statement:",
+                    option_a="Investing grows wealth",
+                    option_b="Saving is useless",
+                    option_c="Debt is good",
+                    option_d="Spend everything",
+                    correct_option="A",
+                    xp_value=10
+                ),
+                 models.QuizQuestion(
+                    quiz_id=quiz.id,
+                    question_text="Key takeaway from this lesson?",
+                    option_a="Start early",
+                    option_b="Wait for luck",
+                    option_c="Avoid money",
+                    option_d="None of the above",
+                    correct_option="A",
+                    xp_value=10
+                ),
+                 models.QuizQuestion(
+                    quiz_id=quiz.id,
+                    question_text="How much XP is this worth?",
+                    option_a="10 XP",
+                    option_b="0 XP",
+                    option_c="100 XP",
+                    option_d="50 XP",
+                    correct_option="A",
+                    xp_value=10
+                )
+            ]
+            
+            for q in questions:
+                db.add(q)
+                
+            count += 1
+            print(f"Added video: {video.title}")
+        else:
+            print(f"Skipping duplicate video: {video_data['title']}")
     
     db.commit()
-    print(f"✅ Successfully seeded {count} professional course videos AND Quizzes!")
+    print(f"✅ Successfully seeded {count} new professional course videos AND Quizzes!")
 
 
 def main():
