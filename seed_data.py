@@ -121,6 +121,157 @@ def seed_learn_videos(db):
     print(f"Successfully seeded {len(videos)} learn videos!")
 
 
+def seed_professional_course(db):
+    """
+    Seed valid professional finance course data.
+    Structure: 3 Modules x 4 Videos = 12 Videos.
+    """
+    # Check if videos already exist to avoid duplicates
+    existing_count = db.query(models.LearnVideo).count()
+    if existing_count > 0:
+        print(f"Database already contains {existing_count} videos. Skipping professional seed.")
+        return
+
+    print("Seeding professional finance course content...")
+
+    videos_data = [
+        # --- MODULE 1: STOCK MARKET BASICS ---
+        {
+            "title": "Module 1: How the Stock Market Works",
+            "description": "A comprehensive introduction to the stock market, exchanges (NSE/BSE), and how shares are traded.",
+            "thumbnail_url": "https://img.youtube.com/vi/p7HKvqRI_Bo/hqdefault.jpg",
+            "youtube_video_id": "p7HKvqRI_Bo",
+            "category": "Stock Market Basics",
+            "duration_minutes": 15,
+            "is_featured": True,
+            "order_index": 1
+        },
+        {
+            "title": "Module 1: Bull vs Bear Markets Explained",
+            "description": "Understand market cycles. What defines a Bull market versus a Bear market and how to invest in each.",
+            "thumbnail_url": "https://img.youtube.com/vi/gvZSpET11ZY/hqdefault.jpg",
+            "youtube_video_id": "gvZSpET11ZY",
+            "category": "Stock Market Basics",
+            "duration_minutes": 12,
+            "is_featured": False,
+            "order_index": 2
+        },
+        {
+            "title": "Module 1: Market Capitalization Types",
+            "description": "Large-cap, Mid-cap, and Small-cap stocks explained. Learn the risk and reward profile of each category.",
+            "thumbnail_url": "https://img.youtube.com/vi/b11Vrdw_3uU/hqdefault.jpg",
+            "youtube_video_id": "b11Vrdw_3uU",
+            "category": "Stock Market Basics",
+            "duration_minutes": 10,
+            "is_featured": False,
+            "order_index": 3
+        },
+        {
+            "title": "Module 1: Fundamental vs Technical Analysis",
+            "description": "The difference between analyzing company fundamentals vs reading chart patterns for trading.",
+            "thumbnail_url": "https://img.youtube.com/vi/Xn7KWR9EOGQ/hqdefault.jpg",
+            "youtube_video_id": "Xn7KWR9EOGQ",
+            "category": "Stock Market Basics",
+            "duration_minutes": 18,
+            "is_featured": True,
+            "order_index": 4
+        },
+
+        # --- MODULE 2: MUTUAL FUNDS & SIPs ---
+        {
+            "title": "Module 2: Mutual Funds for Beginners",
+            "description": "What are Mutual Funds? How they pool money from investors to buy a basket of securities.",
+            "thumbnail_url": "https://img.youtube.com/vi/UZgRHNvOXFk/hqdefault.jpg",
+            "youtube_video_id": "UZgRHNvOXFk",
+            "category": "Mutual Funds & SIPs",
+            "duration_minutes": 14,
+            "is_featured": True,
+            "order_index": 5
+        },
+        {
+            "title": "Module 2: Power of Compounding (SIP)",
+            "description": "See the magic of compound interest with Systematic Investment Plans (SIP) over the long term.",
+            "thumbnail_url": "https://img.youtube.com/vi/Xr3lBXPWw30/hqdefault.jpg",
+            "youtube_video_id": "Xr3lBXPWw30",
+            "category": "Mutual Funds & SIPs",
+            "duration_minutes": 11,
+            "is_featured": False,
+            "order_index": 6
+        },
+        {
+            "title": "Module 2: Active vs Passive Funds",
+            "description": "Should you pay for a fund manager or buy the index? Analyzing expense ratios and performance.",
+            "thumbnail_url": "https://img.youtube.com/vi/fvGLnthJDsg/hqdefault.jpg",
+            "youtube_video_id": "fvGLnthJDsg",
+            "category": "Mutual Funds & SIPs",
+            "duration_minutes": 16,
+            "is_featured": False,
+            "order_index": 7
+        },
+        {
+            "title": "Module 2: How to Choose a Mutual Fund",
+            "description": "A checklist for selecting the right mutual fund based on your goals, risk tolerance, and time horizon.",
+            "thumbnail_url": "https://img.youtube.com/vi/RkyXOH6laXA/hqdefault.jpg",
+            "youtube_video_id": "RkyXOH6laXA",
+            "category": "Mutual Funds & SIPs",
+            "duration_minutes": 13,
+            "is_featured": False,
+            "order_index": 8
+        },
+
+        # --- MODULE 3: TAX & FINANCIAL PLANNING ---
+        {
+            "title": "Module 3: Income Tax Basics (Old vs New)",
+            "description": "Understanding the Indian Income Tax slabs and the difference between the Old and New tax regimes.",
+            "thumbnail_url": "https://img.youtube.com/vi/BjpGmqo7z1A/hqdefault.jpg",
+            "youtube_video_id": "BjpGmqo7z1A",
+            "category": "Tax & Financial Planning",
+            "duration_minutes": 20,
+            "is_featured": True,
+            "order_index": 9
+        },
+        {
+            "title": "Module 3: Tax Saving via Section 80C",
+            "description": "How to save tax legally using PPF, ELSS, EPF, and other instruments under Section 80C.",
+            "thumbnail_url": "https://img.youtube.com/vi/1BYs84vegLk/hqdefault.jpg",
+            "youtube_video_id": "1BYs84vegLk",
+            "category": "Tax & Financial Planning",
+            "duration_minutes": 15,
+            "is_featured": False,
+            "order_index": 10
+        },
+        {
+            "title": "Module 3: Why You Need Health Insurance",
+            "description": "Financial planning isn't just about investing; it's about protection. Importance of health and term insurance.",
+            "thumbnail_url": "https://img.youtube.com/vi/uB_YqwqK_hE/hqdefault.jpg",
+            "youtube_video_id": "uB_YqwqK_hE",
+            "category": "Tax & Financial Planning",
+            "duration_minutes": 12,
+            "is_featured": False,
+            "order_index": 11
+        },
+        {
+            "title": "Module 3: Retirement Planning 101",
+            "description": "How to calculate your retirement corpus and start planning for your golden years early.",
+            "thumbnail_url": "https://img.youtube.com/vi/Gj3sQhD_M-4/hqdefault.jpg",
+            "youtube_video_id": "Gj3sQhD_M-4",
+            "category": "Tax & Financial Planning",
+            "duration_minutes": 14,
+            "is_featured": True,
+            "order_index": 12
+        }
+    ]
+
+    count = 0
+    for video_data in videos_data:
+        video = models.LearnVideo(**video_data)
+        db.add(video)
+        count += 1
+    
+    db.commit()
+    print(f"✅ Successfully seeded {count} professional course videos!")
+
+
 def main():
     print("=" * 50)
     print("FinWise Database Seeding Script")
@@ -129,7 +280,8 @@ def main():
     db = SessionLocal()
     
     try:
-        seed_learn_videos(db)
+        # Using the new professional course seeder
+        seed_professional_course(db)
         print("\nDatabase seeding completed successfully!")
     except Exception as e:
         print(f"\nError during seeding: {e}")
