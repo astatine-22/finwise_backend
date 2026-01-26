@@ -757,6 +757,22 @@ class QuizSubmitResponse(BaseModel):
     message: str
 
 
+# --- Gamification Request Schemas ---
+
+class VideoCompleteRequest(BaseModel):
+    email: str
+    video_id: int
+
+class AnswerCheckRequest(BaseModel):
+    email: str
+    question_id: int
+    selected_option: str # "A", "B", "C", "D"
+
+class BonusRequest(BaseModel):
+    email: str
+    quiz_id: int
+
+
 # --- Learn Module API Endpoints ---
 
 @app.get("/api/learn/videos", response_model=List[LearnVideoResponse])
@@ -1403,6 +1419,97 @@ def get_combined_quiz(module_number: int, db: Session = Depends(get_db)):
         "total_questions": len(questions_response),
         "questions": questions_response
     }
+
+
+# ============================================================================
+# NEW GAMIFICATION ENDPOINTS
+# ============================================================================
+
+@app.post("/api/learn/video/complete", response_model=SimpleResponse)
+def complete_video_v2(request: VideoCompleteRequest, db: Session = Depends(get_db)):
+    """
+    Awards 100 XP when a user finishes watching a video.
+    Checks UserVideoProgress to ensure XP is awarded only once per video.
+    """
+    # Find User
+    user = db.query(models.User).filter(models.User.email == request.email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Check if already watched
+    progress = db.query(models.UserVideoProgress).filter(
+        models.UserVideoProgress.user_id == user.id,
+        models.UserVideoProgress.video_id == request.video_id
+    ).first()
+    
+    if progress:
+        return {"message": "Already watched"}
+        
+    # Mark as watched
+    new_progress = models.UserVideoProgress(
+        user_id=user.id,
+        video_id=request.video_id,
+        watched_at=datetime.utcnow()
+    )
+    db.add(new_progress)
+    
+    # Award 100 XP
+    user.xp = (user.xp or 0) + 100
+    
+    # Update streak (using existing helper)
+    update_user_streak(user, db)
+    
+    db.commit()
+    
+    return {"message": "100 XP Awarded"}
+
+
+@app.post("/api/learn/quiz/check-answer")
+def check_answer(request: AnswerCheckRequest, db: Session = Depends(get_db)):
+    """
+    Validates a single quiz answer in real-time.
+    Awards 10 XP immediately if correct.
+    Returns correctness status and the correct option.
+    """
+    # Find Question
+    question = db.query(models.QuizQuestion).filter(models.QuizQuestion.id == request.question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+        
+    # Check Answer
+    is_correct = (request.selected_option.upper() == question.correct_option)
+    xp_awarded = 0
+    
+    if is_correct:
+        # Find User to award XP
+        user = db.query(models.User).filter(models.User.email == request.email.lower()).first()
+        if user:
+            xp_awarded = 10
+            user.xp = (user.xp or 0) + xp_awarded
+            db.commit()
+            
+    return {
+        "correct": is_correct,
+        "correct_option": question.correct_option,
+        "xp_awarded": xp_awarded
+    }
+
+
+@app.post("/api/learn/quiz/bonus", response_model=SimpleResponse)
+def award_quiz_bonus(request: BonusRequest, db: Session = Depends(get_db)):
+    """
+    Awards a 50 XP bonus for completing a quiz (e.g., getting 10/10).
+    Called by frontend upon perfect completion.
+    """
+    user = db.query(models.User).filter(models.User.email == request.email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Award 50 XP Bonus
+    user.xp = (user.xp or 0) + 50
+    db.commit()
+    
+    return {"message": "50 XP Bonus Awarded"}
 
 
 # ============================================================================

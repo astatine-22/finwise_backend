@@ -57,8 +57,21 @@ class LearnVideo(Base):
     order_index = Column(Integer, default=0)  # For custom ordering
 
 
-# ============================================================================
-# PAPER TRADING MODELS
+class UserVideoProgress(Base):
+    """
+    Tracks which videos a user has watched to completion.
+    Prevents awarding XP multiple times for the same video.
+    """
+    __tablename__ = "user_video_progress"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    video_id = Column(Integer, ForeignKey("learn_videos.id"), nullable=False)
+    watched_at = Column(DateTime, nullable=False)
+    
+    # Relationships
+    user = relationship("User")
+    video = relationship("LearnVideo")
 # ============================================================================
 
 class Portfolio(Base):
