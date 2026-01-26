@@ -126,10 +126,88 @@ def seed_professional_course(db):
     Seed valid professional finance course data.
     Structure: 3 Modules x 4 Videos = 12 Videos.
     """
-    # Check if videos already exist to avoid duplicates
-    existing_count = db.query(models.LearnVideo).count()
-    if existing_count > 0:
-        print(f"Database already contains {existing_count} videos. Skipping professional seed.")
+    # Check if videos already exist
+    existing_videos = db.query(models.LearnVideo).all()
+    
+    if existing_videos:
+        print(f"Found {len(existing_videos)} existing videos. Checking for missing quizzes...")
+        quiz_count = 0
+        for video in existing_videos:
+            # Check if likely a professional course video (has title Module...) or just any video
+            # We will add quiz to ALL videos for now to be safe
+            
+            existing_quiz = db.query(models.Quiz).filter_by(video_id=video.id).first()
+            if not existing_quiz:
+                 # Create Quiz for this video
+                quiz = models.Quiz(
+                    title=f"Quiz: {video.title}",
+                    video_id=video.id
+                )
+                db.add(quiz)
+                db.flush()
+
+                # Create 5 Questions
+                questions = [
+                    models.QuizQuestion(
+                        quiz_id=quiz.id,
+                        question_text=f"What is the main topic of {video.title}?",
+                        option_a="Finance",
+                        option_b="Cooking",
+                        option_c="Sports",
+                        option_d="Music",
+                        correct_option="A",
+                        xp_value=10
+                    ),
+                    models.QuizQuestion(
+                        quiz_id=quiz.id,
+                        question_text="Concept Check: True or False?",
+                        option_a="True",
+                        option_b="False",
+                        option_c="Maybe",
+                        option_d="Unknown",
+                        correct_option="A",
+                        xp_value=10
+                    ),
+                    models.QuizQuestion(
+                        quiz_id=quiz.id,
+                        question_text="Select the correct statement:",
+                        option_a="Investing grows wealth",
+                        option_b="Saving is useless",
+                        option_c="Debt is good",
+                        option_d="Spend everything",
+                        correct_option="A",
+                        xp_value=10
+                    ),
+                     models.QuizQuestion(
+                        quiz_id=quiz.id,
+                        question_text="Key takeaway from this lesson?",
+                        option_a="Start early",
+                        option_b="Wait for luck",
+                        option_c="Avoid money",
+                        option_d="None of the above",
+                        correct_option="A",
+                        xp_value=10
+                    ),
+                     models.QuizQuestion(
+                        quiz_id=quiz.id,
+                        question_text="How much XP is this worth?",
+                        option_a="10 XP",
+                        option_b="0 XP",
+                        option_c="100 XP",
+                        option_d="50 XP",
+                        correct_option="A",
+                        xp_value=10
+                    )
+                ]
+                for q in questions:
+                    db.add(q)
+                quiz_count += 1
+        
+        if quiz_count > 0:
+            db.commit()
+            print(f"✅ Retroactively seeded {quiz_count} missing quizzes for existing videos!")
+        else:
+            print("All videos already have quizzes.")
         return
 
     print("Seeding professional finance course content...")
@@ -266,10 +344,77 @@ def seed_professional_course(db):
     for video_data in videos_data:
         video = models.LearnVideo(**video_data)
         db.add(video)
+        db.flush() # Flush to get video.id
+
+        # Create a Quiz for this video
+        quiz = models.Quiz(
+            title=f"Quiz: {video.title}",
+            video_id=video.id
+        )
+        db.add(quiz)
+        db.flush() # Flush to get quiz.id
+
+        # Create 5 Questions for this quiz
+        questions = [
+            models.QuizQuestion(
+                quiz_id=quiz.id,
+                question_text=f"What is the main topic of {video.title}?",
+                option_a="Finance",
+                option_b="Cooking",
+                option_c="Sports",
+                option_d="Music",
+                correct_option="A",
+                xp_value=10
+            ),
+            models.QuizQuestion(
+                quiz_id=quiz.id,
+                question_text="Which concept was discussed?",
+                option_a="Key Financial Concept",
+                option_b="Irrelevant Detail",
+                option_c="Wrong Fact",
+                option_d="Another Wrong Fact",
+                correct_option="A",
+                xp_value=10
+            ),
+            models.QuizQuestion(
+                quiz_id=quiz.id,
+                question_text="True or False: This is important for investors.",
+                option_a="True",
+                option_b="False",
+                option_c="Maybe",
+                option_d="Unknown",
+                correct_option="A",
+                xp_value=10
+            ),
+             models.QuizQuestion(
+                quiz_id=quiz.id,
+                question_text="What is the best approach mentioned?",
+                option_a="Long-term consistency",
+                option_b="Gambling",
+                option_c="Ignoring data",
+                option_d="Panic selling",
+                correct_option="A",
+                xp_value=10
+            ),
+             models.QuizQuestion(
+                quiz_id=quiz.id,
+                question_text="How does this help your portfolio?",
+                option_a="Reduces risk / Increases growth",
+                option_b="Guarantees loss",
+                option_c="No impact",
+                option_d="Increases fees only",
+                correct_option="A",
+                xp_value=10
+            )
+        ]
+        
+        for q in questions:
+            db.add(q)
+            
         count += 1
     
     db.commit()
-    print(f"✅ Successfully seeded {count} professional course videos!")
+    print(f"✅ Successfully seeded {count} professional course videos AND Quizzes!")
 
 
 def main():

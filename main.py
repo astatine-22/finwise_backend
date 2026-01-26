@@ -963,9 +963,49 @@ def seed_learn_v2(db: Session = Depends(get_db)):
     - Personal Finance (4 videos)
     """
     # Check if videos already exist
-    existing_count = db.query(models.LearnVideo).count()
-    if existing_count >= 12:
-        return {"message": f"Database already has {existing_count} videos. Clear data first or skip seed."}
+    existing_videos = db.query(models.LearnVideo).all()
+    
+    # 1. Backfill Quizzes if videos exist but quizzes don't
+    if existing_videos:
+        print(f"Found {len(existing_videos)} existing videos. Checking for missing quizzes...")
+        backfilled_count = 0
+        
+        for video in existing_videos:
+            existing_quiz = db.query(models.Quiz).filter_by(video_id=video.id).first()
+            if not existing_quiz:
+                # Create Quiz
+                quiz = models.Quiz(title=f"{video.title} - Quiz", video_id=video.id)
+                db.add(quiz)
+                db.flush()
+                
+                # Add 5 Generic Questions
+                for i in range(5):
+                    # Rotate through templates
+                    template = question_templates[i % len(question_templates)]
+                    q = models.QuizQuestion(
+                        quiz_id=quiz.id,
+                        question_text=template["question"],
+                        option_a=template["options"][0],
+                        option_b=template["options"][1],
+                        option_c=template["options"][2],
+                        option_d=template["options"][3],
+                        correct_option=template["correct"],
+                        xp_value=10
+                    )
+                    db.add(q)
+                backfilled_count += 1
+        
+        if backfilled_count > 0:
+            db.commit()
+            return {"message": f"✅ Retroactively added quizzes to {backfilled_count} existing videos!"}
+        
+        # If videos exist and quizzes exist, checking if we need to add NEW videos is complex.
+        # For now, if we have 12 or more videos, we assume we are good.
+        if len(existing_videos) >= 12:
+             return {"message": f"Database already has {len(existing_videos)} videos and quizzes. No action needed."}
+    
+    # 2. If no videos (or very few), define the full seed set logic below...
+    # (The original videos_data def follows...)
     
     # Define 12 educational videos with real YouTube content
     videos_data = [
