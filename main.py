@@ -3483,3 +3483,288 @@ def get_crypto_gainers():
     cryptos.sort(key=lambda x: x.change_percent_24h, reverse=True)
     
     return CryptoListResponse(cryptos=cryptos, usd_to_inr=round(usd_to_inr, 2))
+
+
+# =============================================================================
+# LEARN MODULE API ENDPOINTS
+# =============================================================================
+
+class LearnVideoResponse(BaseModel):
+    """Response schema for a learn video."""
+    id: int
+    title: str
+    description: Optional[str]
+    thumbnail_url: Optional[str]
+    youtube_video_id: str  # Full YouTube URL from database
+    category: str
+    duration_minutes: Optional[int]
+    is_featured: bool
+
+
+@app.get("/api/learn/videos", response_model=List[LearnVideoResponse])
+def get_learn_videos(
+    category: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    GET /api/learn/videos
+    
+    Fetch all educational videos, optionally filtered by category.
+    Returns videos with normal YouTube URLs from database.
+    
+    Query params:
+    - category (optional): Filter videos by category (e.g., "Module 1: Stock Market Basics")
+    
+    Returns:
+        List of video objects with youtube_video_id containing full YouTube URLs
+    """
+    query = db.query(models.LearnVideo)
+    
+    if category:
+        query = query.filter(models.LearnVideo.category == category)
+    
+    videos = query.order_by(models.LearnVideo.order_index).all()
+    
+    # Return videos with normal YouTube URLs
+    return [
+        LearnVideoResponse(
+            id=v.id,
+            title=v.title,
+            description=v.description,
+            thumbnail_url=v.thumbnail_url,
+            youtube_video_id=v.youtube_video_id,  # Full YouTube URL from database
+            category=v.category,
+            duration_minutes=v.duration_minutes,
+            is_featured=v.is_featured
+        )
+        for v in videos
+    ]
+
+
+@app.get("/api/learn/categories", response_model=List[str])
+def get_learn_categories(db: Session = Depends(get_db)):
+    """
+    GET /api/learn/categories
+    
+    Fetch all unique video categories for filtering.
+    
+    Returns:
+        List of category strings (e.g., ["Module 1: Stock Market Basics", ...])
+    """
+    categories = db.query(models.LearnVideo.category).distinct().all()
+    return [cat[0] for cat in categories if cat[0]]
+
+
+# --- Quiz System Endpoints ---
+
+class QuizQuestionResponse(BaseModel):
+    """Response schema for a quiz question."""
+    id: int
+    question_text: str
+    option_a: str
+    option_b: str
+    option_c: str
+    option_d: str
+    xp_value: int
+
+
+class QuizResponse(BaseModel):
+    """Response schema for a complete quiz."""
+    id: int
+    title: str
+    video_id: int
+    questions: List[QuizQuestionResponse]
+
+
+class CheckAnswerRequest(BaseModel):
+    """Request to check if an answer is correct."""
+    email: str
+    question_id: int
+    selected_option: str  # "A", "B", "C", or "D"
+
+
+class CheckAnswerResponse(BaseModel):
+    """Response after checking an answer."""
+    is_correct: bool
+    correct_option: str
+    xp_message: str
+
+
+class ClaimBonusRequest(BaseModel):
+    """Request to claim quiz completion bonus."""
+    email: str
+    quiz_id: int
+
+
+class BonusResponse(BaseModel):
+    """Response with bonus XP awarded."""
+    success: bool
+    message: str
+    xp_bonus: int
+
+
+@app.get("/api/learn/quiz/{video_id}", response_model=QuizResponse)
+def get_quiz(video_id: int, db: Session = Depends(get_db)):
+    """
+    GET /api/learn/quiz/{video_id}
+    
+    Fetch the quiz for a specific video.
+    
+    Path params:
+    - video_id: ID of the lesson video
+    
+    Returns:
+        Quiz object with all questions (but NOT the correct answers)
+    """
+    quiz = db.query(models.Quiz).filter(
+        models.Quiz.video_id == video_id
+    ).first()
+    
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found for this video")
+    
+    # Fetch questions
+    questions = db.query(models.QuizQuestion).filter(
+        models.QuizQuestion.quiz_id == quiz.id
+    ).all()
+    
+    return QuizResponse(
+        id=quiz.id,
+        title=quiz.title,
+        video_id=quiz.video_id,
+        questions=[
+            QuizQuestionResponse(
+                id=q.id,
+                question_text=q.question_text,
+                option_a=q.option_a,
+                option_b=q.option_b,
+                option_c=q.option_c,
+                option_d=q.option_d,
+                xp_value=q.xp_value
+            )
+            for q in questions
+        ]
+    )
+
+
+@app.post("/api/learn/quiz/check-answer", response_model=CheckAnswerResponse)
+def check_answer(request: CheckAnswerRequest, db: Session = Depends(get_db)):
+    """
+    POST /api/learn/quiz/check-answer
+    
+    Check if a submitted answer is correct and award XP.
+    
+    Request body:
+    - email: User's email
+    - question_id: ID of the quiz question
+    - selected_option: User's answer ("A", "B", "C", or "D")
+    
+    Returns:
+        Result indicating if answer is correct + XP message
+    """
+    # Find user
+    user = db.query(models.User).filter(
+        models.User.email == request.email.lower()
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Find question
+    question = db.query(models.QuizQuestion).filter(
+        models.QuizQuestion.id == request.question_id
+    ).first()
+    
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    
+    # Check if answer is correct
+    is_correct = request.selected_option.upper() == question.correct_option.upper()
+    
+    if is_correct:
+        # Award XP
+        user.xp = (user.xp or 0) + question.xp_value
+        db.commit()
+        
+        return CheckAnswerResponse(
+            is_correct=True,
+            correct_option=question.correct_option,
+            xp_message=f"+{question.xp_value} XP! Total: {user.xp} XP"
+        )
+    else:
+        return CheckAnswerResponse(
+            is_correct=False,
+            correct_option=question.correct_option,
+            xp_message="Try again!"
+        )
+
+
+@app.post("/api/learn/quiz/claim-bonus", response_model=BonusResponse)
+def claim_bonus(request: ClaimBonusRequest, db: Session = Depends(get_db)):
+    """
+    POST /api/learn/quiz/claim-bonus
+    
+    Claim bonus XP for completing all quiz questions.
+    Awards extra 10 XP per question completed.
+    
+    Request body:
+    - email: User's email
+    - quiz_id: ID of the completed quiz
+    
+    Returns:
+        Success message with total bonus XP awarded
+    """
+    # Find user
+    user = db.query(models.User).filter(
+        models.User.email == request.email.lower()
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Find quiz
+    quiz = db.query(models.Quiz).filter(
+        models.Quiz.id == request.quiz_id
+    ).first()
+    
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    # Check if user already claimed bonus for this quiz
+    existing_attempt = db.query(models.UserQuizAttempt).filter(
+        models.UserQuizAttempt.user_id == user.id,
+        models.UserQuizAttempt.quiz_id == request.quiz_id
+    ).first()
+    
+    if existing_attempt:
+        return BonusResponse(
+            success=False,
+            message="You've already completed this quiz!",
+            xp_bonus=0
+        )
+    
+    # Count questions for bonus calculation
+    question_count = db.query(models.QuizQuestion).filter(
+        models.QuizQuestion.quiz_id == quiz.id
+    ).count()
+    
+    bonus_xp = question_count * 10  # 10 XP bonus per question
+    
+    # Award bonus XP
+    user.xp = (user.xp or 0) + bonus_xp
+    
+    # Record quiz completion
+    attempt = models.UserQuizAttempt(
+        user_id=user.id,
+        quiz_id=quiz.id,
+        score=question_count,  # Assume all correct for now
+        completed_at=datetime.utcnow()
+    )
+    db.add(attempt)
+    db.commit()
+    
+    return BonusResponse(
+        success=True,
+        message=f"🎉 Quiz Completed! +{bonus_xp} Bonus XP!",
+        xp_bonus=bonus_xp
+    )
