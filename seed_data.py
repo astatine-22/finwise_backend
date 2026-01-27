@@ -153,40 +153,42 @@ def reset_and_seed(db):
     # 3. Reseed with Video IDs (keeping URLs as backup reference)
     verified_videos = [
         # --- MODULE 1: BASICS ---
-        {"title": "How the Stock Market Works", "id": "p7HKvqRI_Bo", "url": "https://www.youtube.com/watch?v=p7HKvqRI_Bo", "cat": "Module 1: Stock Market Basics", "dur": 15},
-        {"title": "What is the Stock Market?", "id": "ZCFkWDdmXG8", "url": "https://www.youtube.com/watch?v=ZCFkWDdmXG8", "cat": "Module 1: Stock Market Basics", "dur": 12},
-        {"title": "Buying Your First Stock", "id": "bTvx6c2Yy1k", "url": "https://www.youtube.com/watch?v=bTvx6c2Yy1k", "cat": "Module 1: Stock Market Basics", "dur": 14},
-        {"title": "Investing for Beginners", "id": "i5qUq7E-PUQ", "url": "https://www.youtube.com/watch?v=i5qUq7E-PUQ", "cat": "Module 1: Stock Market Basics", "dur": 18},
+        {"title": "How the Stock Market Works", "id": "p7HKvqRI_Bo", "url": "https://www.youtube.com/embed/p7HKvqRI_Bo", "cat": "Module 1: Stock Market Basics", "dur": 15},
+        {"title": "What is the Stock Market?", "id": "ZCFkWDdmXG8", "url": "https://www.youtube.com/embed/ZCFkWDdmXG8", "cat": "Module 1: Stock Market Basics", "dur": 12},
+        {"title": "Buying Your First Stock", "id": "bTvx6c2Yy1k", "url": "https://www.youtube.com/embed/bTvx6c2Yy1k", "cat": "Module 1: Stock Market Basics", "dur": 14},
+        {"title": "Investing for Beginners", "id": "i5qUq7E-PUQ", "url": "https://www.youtube.com/embed/i5qUq7E-PUQ", "cat": "Module 1: Stock Market Basics", "dur": 18},
         
         # --- MODULE 2: MUTUAL FUNDS ---
-        {"title": "Mutual Funds Explained", "id": "tRC5aQ7sMhQ", "url": "https://www.youtube.com/watch?v=tRC5aQ7sMhQ", "cat": "Module 2: Mutual Funds", "dur": 15},
-        {"title": "SIP vs Lumpsum", "id": "ImZz4R5p_6c", "url": "https://www.youtube.com/watch?v=ImZz4R5p_6c", "cat": "Module 2: Mutual Funds", "dur": 10},
-        {"title": "Power of Compounding", "id": "6mIbI17p_kU", "url": "https://www.youtube.com/watch?v=6mIbI17p_kU", "cat": "Module 2: Mutual Funds", "dur": 8},
-        {"title": "Index Funds vs Mutual Funds", "id": "H9eIgnC60b0", "url": "https://www.youtube.com/watch?v=H9eIgnC60b0", "cat": "Module 2: Mutual Funds", "dur": 13},
+        {"title": "Mutual Funds Explained", "id": "tRC5aQ7sMhQ", "url": "https://www.youtube.com/embed/tRC5aQ7sMhQ", "cat": "Module 2: Mutual Funds", "dur": 15},
+        {"title": "SIP vs Lumpsum", "id": "ImZz4R5p_6c", "url": "https://www.youtube.com/embed/ImZz4R5p_6c", "cat": "Module 2: Mutual Funds", "dur": 10},
+        {"title": "Power of Compounding", "id": "6mIbI17p_kU", "url": "https://www.youtube.com/embed/6mIbI17p_kU", "cat": "Module 2: Mutual Funds", "dur": 8},
+        {"title": "Index Funds vs Mutual Funds", "id": "H9eIgnC60b0", "url": "https://www.youtube.com/embed/H9eIgnC60b0", "cat": "Module 2: Mutual Funds", "dur": 13},
 
         # --- MODULE 3: PERSONAL FINANCE ---
-        {"title": "50/30/20 Budget Rule", "id": "s3EtjSg_bF4", "url": "https://www.youtube.com/watch?v=s3EtjSg_bF4", "cat": "Module 3: Personal Finance", "dur": 10},
-        {"title": "Emergency Fund Guide", "id": "9L9I_K2kFkI", "url": "https://www.youtube.com/watch?v=9L9I_K2kFkI", "cat": "Module 3: Personal Finance", "dur": 8},
-        {"title": "Credit Cards 101", "id": "4j2emMn7UaI", "url": "https://www.youtube.com/watch?v=4j2emMn7UaI", "cat": "Module 3: Personal Finance", "dur": 12},
-        {"title": "Income Tax Basics", "id": "b8_9j6kHh9I", "url": "https://www.youtube.com/watch?v=b8_9j6kHh9I", "cat": "Module 3: Personal Finance", "dur": 15},
+        {"title": "50/30/20 Budget Rule", "id": "s3EtjSg_bF4", "url": "https://www.youtube.com/embed/s3EtjSg_bF4", "cat": "Module 3: Personal Finance", "dur": 10},
+        {"title": "Emergency Fund Guide", "id": "9L9I_K2kFkI", "url": "https://www.youtube.com/embed/9L9I_K2kFkI", "cat": "Module 3: Personal Finance", "dur": 8},
+        {"title": "Credit Cards 101", "id": "4j2emMn7UaI", "url": "https://www.youtube.com/embed/4j2emMn7UaI", "cat": "Module 3: Personal Finance", "dur": 12},
+        {"title": "Income Tax Basics", "id": "b8_9j6kHh9I", "url": "https://www.youtube.com/embed/b8_9j6kHh9I", "cat": "Module 3: Personal Finance", "dur": 15},
 
         # --- MODULE 4: CRYPTOCURRENCY ---
-        {"title": "Bitcoin for Beginners", "id": "s4g1XFU8Gto", "url": "https://www.youtube.com/watch?v=s4g1XFU8Gto", "cat": "Module 4: Cryptocurrency", "dur": 12},
-        {"title": "What is Blockchain?", "id": "SSo_EIwHSd4", "url": "https://www.youtube.com/watch?v=SSo_EIwHSd4", "cat": "Module 4: Cryptocurrency", "dur": 14},
-        {"title": "Crypto vs Stocks", "id": "1YyAzVmP9xM", "url": "https://www.youtube.com/watch?v=1YyAzVmP9xM", "cat": "Module 4: Cryptocurrency", "dur": 10},
-        {"title": "How to Buy Crypto Safe", "id": "LcJPd5wJ7Zk", "url": "https://www.youtube.com/watch?v=LcJPd5wJ7Zk", "cat": "Module 4: Cryptocurrency", "dur": 16},
+        {"title": "Bitcoin for Beginners", "id": "s4g1XFU8Gto", "url": "https://www.youtube.com/embed/s4g1XFU8Gto", "cat": "Module 4: Cryptocurrency", "dur": 12},
+        {"title": "What is Blockchain?", "id": "SSo_EIwHSd4", "url": "https://www.youtube.com/embed/SSo_EIwHSd4", "cat": "Module 4: Cryptocurrency", "dur": 14},
+        {"title": "Crypto vs Stocks", "id": "1YyAzVmP9xM", "url": "https://www.youtube.com/embed/1YyAzVmP9xM", "cat": "Module 4: Cryptocurrency", "dur": 10},
+        {"title": "How to Buy Crypto Safe", "id": "LcJPd5wJ7Zk", "url": "https://www.youtube.com/embed/LcJPd5wJ7Zk", "cat": "Module 4: Cryptocurrency", "dur": 16},
     ]
 
     count = 0
     for v_data in verified_videos:
-        # Use the clean ID directly (url field kept as backup reference only)
+        # Use the embed URL directly from the data
+        embed_url = v_data["url"]
+        # Extract video ID for thumbnail generation
         video_id = v_data["id"]
         
         video = models.LearnVideo(
             title=v_data["title"],
             description=f"Learn about {v_data['title']}",
             thumbnail_url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
-            youtube_video_id=video_id,  # Storing ID now, NOT URL
+            youtube_video_id=embed_url,  # Storing embed URL now
             category=v_data["cat"],
             duration_minutes=v_data["dur"],
             is_featured=True,
