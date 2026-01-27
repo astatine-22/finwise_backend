@@ -150,43 +150,43 @@ def reset_and_seed(db):
         ]
     }
 
-    # 3. Reseed with VERIFIED Full URLs
+    # 3. Reseed with Video IDs (keeping URLs as backup reference)
     verified_videos = [
-        # --- MODULE 1: STOCK MARKET BASICS ---
-        {"title": "How the Stock Market Works", "url": "https://www.youtube.com/watch?v=p7HKvqRI_Bo", "cat": "Module 1: Stock Market Basics", "dur": 15},
-        {"title": "What is the Stock Market?", "url": "https://www.youtube.com/watch?v=ZCFkWDdmXG8", "cat": "Module 1: Stock Market Basics", "dur": 12},
-        {"title": "Buying Your First Stock", "url": "https://www.youtube.com/watch?v=bTvx6c2Yy1k", "cat": "Module 1: Stock Market Basics", "dur": 14},
-        {"title": "Investing for Beginners", "url": "https://www.youtube.com/watch?v=i5qUq7E-PUQ", "cat": "Module 1: Stock Market Basics", "dur": 18},
+        # --- MODULE 1: BASICS ---
+        {"title": "How the Stock Market Works", "id": "p7HKvqRI_Bo", "url": "https://www.youtube.com/watch?v=p7HKvqRI_Bo", "cat": "Module 1: Stock Market Basics", "dur": 15},
+        {"title": "What is the Stock Market?", "id": "ZCFkWDdmXG8", "url": "https://www.youtube.com/watch?v=ZCFkWDdmXG8", "cat": "Module 1: Stock Market Basics", "dur": 12},
+        {"title": "Buying Your First Stock", "id": "bTvx6c2Yy1k", "url": "https://www.youtube.com/watch?v=bTvx6c2Yy1k", "cat": "Module 1: Stock Market Basics", "dur": 14},
+        {"title": "Investing for Beginners", "id": "i5qUq7E-PUQ", "url": "https://www.youtube.com/watch?v=i5qUq7E-PUQ", "cat": "Module 1: Stock Market Basics", "dur": 18},
         
         # --- MODULE 2: MUTUAL FUNDS ---
-        {"title": "Mutual Funds Explained", "url": "https://www.youtube.com/watch?v=tRC5aQ7sMhQ", "cat": "Module 2: Mutual Funds", "dur": 15},
-        {"title": "SIP vs Lumpsum", "url": "https://www.youtube.com/watch?v=ImZz4R5p_6c", "cat": "Module 2: Mutual Funds", "dur": 10},
-        {"title": "Power of Compounding", "url": "https://www.youtube.com/watch?v=6mIbI17p_kU", "cat": "Module 2: Mutual Funds", "dur": 8},
-        {"title": "Index Funds vs Mutual Funds", "url": "https://www.youtube.com/watch?v=H9eIgnC60b0", "cat": "Module 2: Mutual Funds", "dur": 13},
+        {"title": "Mutual Funds Explained", "id": "tRC5aQ7sMhQ", "url": "https://www.youtube.com/watch?v=tRC5aQ7sMhQ", "cat": "Module 2: Mutual Funds", "dur": 15},
+        {"title": "SIP vs Lumpsum", "id": "ImZz4R5p_6c", "url": "https://www.youtube.com/watch?v=ImZz4R5p_6c", "cat": "Module 2: Mutual Funds", "dur": 10},
+        {"title": "Power of Compounding", "id": "6mIbI17p_kU", "url": "https://www.youtube.com/watch?v=6mIbI17p_kU", "cat": "Module 2: Mutual Funds", "dur": 8},
+        {"title": "Index Funds vs Mutual Funds", "id": "H9eIgnC60b0", "url": "https://www.youtube.com/watch?v=H9eIgnC60b0", "cat": "Module 2: Mutual Funds", "dur": 13},
 
         # --- MODULE 3: PERSONAL FINANCE ---
-        {"title": "50/30/20 Budget Rule", "url": "https://www.youtube.com/watch?v=s3EtjSg_bF4", "cat": "Module 3: Personal Finance", "dur": 10},
-        {"title": "Emergency Fund Guide", "url": "https://www.youtube.com/watch?v=9L9I_K2kFkI", "cat": "Module 3: Personal Finance", "dur": 8},
-        {"title": "Credit Cards 101", "url": "https://www.youtube.com/watch?v=4j2emMn7UaI", "cat": "Module 3: Personal Finance", "dur": 12},
-        {"title": "Income Tax Basics", "url": "https://www.youtube.com/watch?v=b8_9j6kHh9I", "cat": "Module 3: Personal Finance", "dur": 15},
+        {"title": "50/30/20 Budget Rule", "id": "s3EtjSg_bF4", "url": "https://www.youtube.com/watch?v=s3EtjSg_bF4", "cat": "Module 3: Personal Finance", "dur": 10},
+        {"title": "Emergency Fund Guide", "id": "9L9I_K2kFkI", "url": "https://www.youtube.com/watch?v=9L9I_K2kFkI", "cat": "Module 3: Personal Finance", "dur": 8},
+        {"title": "Credit Cards 101", "id": "4j2emMn7UaI", "url": "https://www.youtube.com/watch?v=4j2emMn7UaI", "cat": "Module 3: Personal Finance", "dur": 12},
+        {"title": "Income Tax Basics", "id": "b8_9j6kHh9I", "url": "https://www.youtube.com/watch?v=b8_9j6kHh9I", "cat": "Module 3: Personal Finance", "dur": 15},
 
         # --- MODULE 4: CRYPTOCURRENCY ---
-        {"title": "Bitcoin for Beginners", "url": "https://www.youtube.com/watch?v=s4g1XFU8Gto", "cat": "Module 4: Cryptocurrency", "dur": 12},
-        {"title": "What is Blockchain?", "url": "https://www.youtube.com/watch?v=SSo_EIwHSd4", "cat": "Module 4: Cryptocurrency", "dur": 14},
-        {"title": "Crypto vs Stocks", "url": "https://www.youtube.com/watch?v=1YyAzVmP9xM", "cat": "Module 4: Cryptocurrency", "dur": 10},
-        {"title": "How to Buy Crypto Safe", "url": "https://www.youtube.com/watch?v=LcJPd5wJ7Zk", "cat": "Module 4: Cryptocurrency", "dur": 16},
+        {"title": "Bitcoin for Beginners", "id": "s4g1XFU8Gto", "url": "https://www.youtube.com/watch?v=s4g1XFU8Gto", "cat": "Module 4: Cryptocurrency", "dur": 12},
+        {"title": "What is Blockchain?", "id": "SSo_EIwHSd4", "url": "https://www.youtube.com/watch?v=SSo_EIwHSd4", "cat": "Module 4: Cryptocurrency", "dur": 14},
+        {"title": "Crypto vs Stocks", "id": "1YyAzVmP9xM", "url": "https://www.youtube.com/watch?v=1YyAzVmP9xM", "cat": "Module 4: Cryptocurrency", "dur": 10},
+        {"title": "How to Buy Crypto Safe", "id": "LcJPd5wJ7Zk", "url": "https://www.youtube.com/watch?v=LcJPd5wJ7Zk", "cat": "Module 4: Cryptocurrency", "dur": 16},
     ]
 
     count = 0
     for v_data in verified_videos:
-        # Extract video ID from URL for thumbnail generation
-        video_id = v_data["url"].split("v=")[1].split("&")[0] if "v=" in v_data["url"] else ""
+        # Use the clean ID directly (url field kept as backup reference only)
+        video_id = v_data["id"]
         
         video = models.LearnVideo(
             title=v_data["title"],
             description=f"Learn about {v_data['title']}",
             thumbnail_url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
-            youtube_video_id=v_data["url"],  # Store full URL here
+            youtube_video_id=video_id,  # Storing ID now, NOT URL
             category=v_data["cat"],
             duration_minutes=v_data["dur"],
             is_featured=True,
