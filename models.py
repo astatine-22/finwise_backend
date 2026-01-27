@@ -22,6 +22,7 @@ class User(Base):
     portfolio = relationship("Portfolio", back_populates="user", uselist=False)
     achievements = relationship("UserAchievement", back_populates="user")
     transactions = relationship("Transaction", back_populates="user")
+    savings_goals = relationship("SavingsGoal", back_populates="user")
 
 class Expense(Base):
     __tablename__ = "expenses"
@@ -255,3 +256,28 @@ class UserQuizAttempt(Base):
     # Relationships
     user = relationship("User")
     quiz = relationship("Quiz")
+
+
+# ============================================================================
+# SAVINGS GOALS - Personal Finance Goals Tracking
+# ============================================================================
+
+class SavingsGoal(Base):
+    """
+    Represents a user's savings goal.
+    Tracks progress toward financial targets with deadlines.
+    """
+    __tablename__ = "savings_goals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # Goal details
+    title = Column(String, nullable=False)  # e.g., "Emergency Fund", "New Laptop"
+    target_amount = Column(Float, nullable=False)  # Goal amount in ₹
+    current_amount = Column(Float, default=0.0)  # Current progress in ₹
+    deadline = Column(Date, nullable=True)  # Optional deadline
+    icon_name = Column(String, default="ic_savings")  # Icon for display
+    
+    # Relationship
+    user = relationship("User", back_populates="savings_goals")

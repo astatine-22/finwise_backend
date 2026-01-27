@@ -3768,3 +3768,249 @@ def claim_bonus(request: ClaimBonusRequest, db: Session = Depends(get_db)):
         message=f"🎉 Quiz Completed! +{bonus_xp} Bonus XP!",
         xp_bonus=bonus_xp
     )
+
+
+# =============================================================================
+# SAVINGS GOALS & DAILY STREAK SYSTEM
+# =============================================================================
+
+# --- Helper Function ---
+
+def update_user_streak(user: models.User, db: Session):
+    """
+    Update user's daily streak based on their last activity.
+    Called when user opens the app or performs an action.
+    """
+    from datetime import date, timedelta
+    
+    today = date.today()
+    
+    if user.last_activity_date is None:
+        # First time user
+        user.current_streak = 1
+        user.last_activity_date = today
+    elif user.last_activity_date == today:
+        # Already checked in today, do nothing
+        pass
+    elif user.last_activity_date == today - timedelta(days=1):
+        # Consecutive day - increment streak
+        user.current_streak += 1
+        user.last_activity_date = today
+    else:
+        # Streak broken - reset to 1
+        user.current_streak = 1
+        user.last_activity_date = today
+    
+    db.commit()
+
+
+# --- Pydantic Models ---
+
+class CheckInResponse(BaseModel):
+    """Response after check-in."""
+    streak: int
+    message: str
+
+
+class SavingsGoalResponse(BaseModel):
+    """Response schema for a savings goal."""
+    id: int
+    title: str
+    target_amount: float
+    current_amount: float
+    deadline: Optional[str]  # ISO date string
+    icon_name: str
+    progress_percent: int
+
+
+class CreateGoalRequest(BaseModel):
+    """Request to create a new savings goal."""
+    email: str
+    title: str
+    target_amount: float
+    deadline: Optional[str] = None  # ISO date string (YYYY-MM-DD)
+
+
+class DepositRequest(BaseModel):
+    """Request to deposit money into a goal."""
+    amount: float
+
+
+# --- API Endpoints ---
+
+@app.post("/api/user/check-in", response_model=CheckInResponse)
+def check_in_user(email: str, db: Session = Depends(get_db)):
+    """
+    POST /api/user/check-in
+    
+    Update user's daily streak when they open the app.
+    Call this from the Dashboard on app launch.
+    
+    Query params:
+    - email: User's email
+    
+    Returns:
+        Current streak count and message
+    """
+    user = db.query(models.User).filter(
+        models.User.email == email.lower()
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update streak
+    update_user_streak(user, db)
+    
+    # Generate message based on streak
+    if user.current_streak == 1:
+        message = "Welcome back! Start your streak today!"
+    elif user.current_streak % 7 == 0:
+        message = f"🔥 {user.current_streak} day streak! Amazing!"
+    else:
+        message = f"🔥 {user.current_streak} day streak!"
+    
+    return CheckInResponse(
+        streak=user.current_streak,
+        message=message
+    )
+
+
+@app.get("/api/goals/{email}", response_model=List[SavingsGoalResponse])
+def get_savings_goals(email: str, db: Session = Depends(get_db)):
+    """
+    GET /api/goals/{email}
+    
+    Fetch all savings goals for a user.
+    
+    Path params:
+    - email: User's email
+    
+    Returns:
+        List of savings goals with progress
+    """
+    user = db.query(models.User).filter(
+        models.User.email == email.lower()
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    goals = db.query(models.SavingsGoal).filter(
+        models.SavingsGoal.user_id == user.id
+    ).all()
+    
+    return [
+        SavingsGoalResponse(
+            id=goal.id,
+            title=goal.title,
+            target_amount=goal.target_amount,
+            current_amount=goal.current_amount,
+            deadline=goal.deadline.isoformat() if goal.deadline else None,
+            icon_name=goal.icon_name,
+            progress_percent=int((goal.current_amount / goal.target_amount) * 100) if goal.target_amount > 0 else 0
+        )
+        for goal in goals
+    ]
+
+
+@app.post("/api/goals", response_model=SavingsGoalResponse)
+def create_savings_goal(request: CreateGoalRequest, db: Session = Depends(get_db)):
+    """
+    POST /api/goals
+    
+    Create a new savings goal for a user.
+    
+    Request body:
+    - email: User's email
+    - title: Goal title (e.g., "Emergency Fund")
+    - target_amount: Target amount in ₹
+    - deadline: Optional deadline (YYYY-MM-DD format)
+    
+    Returns:
+        The created savings goal
+    """
+    user = db.query(models.User).filter(
+        models.User.email == request.email.lower()
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Parse deadline if provided
+    goal_deadline = None
+    if request.deadline:
+        try:
+            from datetime import datetime
+            goal_deadline = datetime.fromisoformat(request.deadline).date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid deadline format. Use YYYY-MM-DD")
+    
+    # Create goal
+    new_goal = models.SavingsGoal(
+        user_id=user.id,
+        title=request.title,
+        target_amount=request.target_amount,
+        current_amount=0.0,
+        deadline=goal_deadline,
+        icon_name="ic_savings"
+    )
+    
+    db.add(new_goal)
+    db.commit()
+    db.refresh(new_goal)
+    
+    return SavingsGoalResponse(
+        id=new_goal.id,
+        title=new_goal.title,
+        target_amount=new_goal.target_amount,
+        current_amount=new_goal.current_amount,
+        deadline=new_goal.deadline.isoformat() if new_goal.deadline else None,
+        icon_name=new_goal.icon_name,
+        progress_percent=0
+    )
+
+
+@app.put("/api/goals/{goal_id}/deposit", response_model=SavingsGoalResponse)
+def deposit_to_goal(goal_id: int, request: DepositRequest, db: Session = Depends(get_db)):
+    """
+    PUT /api/goals/{goal_id}/deposit
+    
+    Add money to a savings goal.
+    
+    Path params:
+    - goal_id: ID of the goal
+    
+    Request body:
+    - amount: Amount to deposit in ₹
+    
+    Returns:
+        Updated goal with new progress
+    """
+    goal = db.query(models.SavingsGoal).filter(
+        models.SavingsGoal.id == goal_id
+    ).first()
+    
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    
+    if request.amount <= 0:
+        raise HTTPException(status_code=400, detail="Deposit amount must be positive")
+    
+    # Update current amount
+    goal.current_amount += request.amount
+    db.commit()
+    db.refresh(goal)
+    
+    # Calculate progress
+    progress = int((goal.current_amount / goal.target_amount) * 100) if goal.target_amount > 0 else 0
+    
+    return SavingsGoalResponse(
+        id=goal.id,
+        title=goal.title,
+        target_amount=goal.target_amount,
+        current_amount=goal.current_amount,
+        deadline=goal.deadline.isoformat() if goal.deadline else None,
+        icon_name=goal.icon_name,
+        progress_percent=progress
+    )
