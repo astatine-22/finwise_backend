@@ -150,43 +150,28 @@ def reset_and_seed(db):
         ]
     }
 
-    # 3. Reseed with VERIFIED Full URLs
+    # 3. Reseed with Firebase Video URLs (ExoPlayer compatible)
+    # NOTE: youtube_video_id field now stores direct MP4 URLs from Firebase Storage
     verified_videos = [
-        # --- MODULE 1: STOCK MARKET BASICS ---
-        {"title": "How the Stock Market Works", "url": "https://www.youtube.com/watch?v=p7HKvqRI_Bo", "cat": "Module 1: Stock Market Basics", "dur": 15},
-        {"title": "What is the Stock Market?", "url": "https://www.youtube.com/watch?v=ZCFkWDdmXG8", "cat": "Module 1: Stock Market Basics", "dur": 12},
-        {"title": "Buying Your First Stock", "url": "https://www.youtube.com/watch?v=bTvx6c2Yy1k", "cat": "Module 1: Stock Market Basics", "dur": 14},
-        {"title": "Investing for Beginners", "url": "https://www.youtube.com/watch?v=i5qUq7E-PUQ", "cat": "Module 1: Stock Market Basics", "dur": 18},
-        
-        # --- MODULE 2: MUTUAL FUNDS ---
-        {"title": "Mutual Funds Explained", "url": "https://www.youtube.com/watch?v=tRC5aQ7sMhQ", "cat": "Module 2: Mutual Funds", "dur": 15},
-        {"title": "SIP vs Lumpsum", "url": "https://www.youtube.com/watch?v=ImZz4R5p_6c", "cat": "Module 2: Mutual Funds", "dur": 10},
-        {"title": "Power of Compounding", "url": "https://www.youtube.com/watch?v=6mIbI17p_kU", "cat": "Module 2: Mutual Funds", "dur": 8},
-        {"title": "Index Funds vs Mutual Funds", "url": "https://www.youtube.com/watch?v=H9eIgnC60b0", "cat": "Module 2: Mutual Funds", "dur": 13},
-
-        # --- MODULE 3: PERSONAL FINANCE ---
-        {"title": "50/30/20 Budget Rule", "url": "https://www.youtube.com/watch?v=s3EtjSg_bF4", "cat": "Module 3: Personal Finance", "dur": 10},
-        {"title": "Emergency Fund Guide", "url": "https://www.youtube.com/watch?v=9L9I_K2kFkI", "cat": "Module 3: Personal Finance", "dur": 8},
-        {"title": "Credit Cards 101", "url": "https://www.youtube.com/watch?v=4j2emMn7UaI", "cat": "Module 3: Personal Finance", "dur": 12},
-        {"title": "Income Tax Basics", "url": "https://www.youtube.com/watch?v=b8_9j6kHh9I", "cat": "Module 3: Personal Finance", "dur": 15},
-
-        # --- MODULE 4: CRYPTOCURRENCY ---
-        {"title": "Bitcoin for Beginners", "url": "https://www.youtube.com/watch?v=s4g1XFU8Gto", "cat": "Module 4: Cryptocurrency", "dur": 12},
-        {"title": "What is Blockchain?", "url": "https://www.youtube.com/watch?v=SSo_EIwHSd4", "cat": "Module 4: Cryptocurrency", "dur": 14},
-        {"title": "Crypto vs Stocks", "url": "https://www.youtube.com/watch?v=1YyAzVmP9xM", "cat": "Module 4: Cryptocurrency", "dur": 10},
-        {"title": "How to Buy Crypto Safe", "url": "https://www.youtube.com/watch?v=LcJPd5wJ7Zk", "cat": "Module 4: Cryptocurrency", "dur": 16},
+        # --- SINGLE TEST VIDEO (Firebase Storage MP4) ---
+        {
+            "title": "Stock Market Basics",
+            "url": "PASTE_YOUR_FIREBASE_LINK_HERE",  # Replace with your Firebase Storage URL
+            "cat": "Basics",
+            "dur": 10,
+            "desc": "Introduction to the stock market."
+        },
     ]
 
     count = 0
     for v_data in verified_videos:
-        # Extract video ID from URL for thumbnail generation
-        video_id = v_data["url"].split("v=")[1].split("&")[0] if "v=" in v_data["url"] else ""
-        
+        # For Firebase URLs, we don't have auto-thumbnails like YouTube
+        # Using a placeholder or you can add your own thumbnail_url field to v_data
         video = models.LearnVideo(
             title=v_data["title"],
-            description=f"Learn about {v_data['title']}",
-            thumbnail_url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
-            youtube_video_id=v_data["url"],  # Store full URL here
+            description=v_data.get("desc", f"Learn about {v_data['title']}"),
+            thumbnail_url=v_data.get("thumbnail", ""),  # Empty or add custom thumbnail
+            youtube_video_id=v_data["url"],  # This now stores Firebase MP4 URL
             category=v_data["cat"],
             duration_minutes=v_data["dur"],
             is_featured=True,
