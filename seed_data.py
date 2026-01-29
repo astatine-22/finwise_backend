@@ -153,13 +153,12 @@ def reset_and_seed(db):
     # 3. Reseed with Firebase Video URLs (ExoPlayer compatible)
     # NOTE: youtube_video_id field now stores direct MP4 URLs from Firebase Storage
     verified_videos = [
-        # --- SINGLE TEST VIDEO (Firebase Storage MP4) ---
         {
-            "title": "Stock Market Basics",
-            "url": "PASTE_YOUR_FIREBASE_LINK_HERE",  # Replace with your Firebase Storage URL
-            "cat": "Basics",
-            "dur": 10,
-            "desc": "Introduction to the stock market."
+            "title": "How does the stock market work?",
+            "url": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/How%20does%20the%20stock%20market%20work_%20-%20Oliver%20Elfenbaum.mp4?alt=media&token=cc7ae80e-fb9b-4cca-b20c-ef955f136dd9",
+            "cat": "Investing Basics",
+            "dur": 5,
+            "desc": "Oliver Elfenbaum explains the history of the Dutch East India Company and how modern stock markets function today."
         },
     ]
 
