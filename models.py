@@ -188,74 +188,7 @@ class Transaction(Base):
     user = relationship("User", back_populates="transactions")
 
 
-# ============================================================================
-# QUIZ SYSTEM - Learning Module Assessments
-# ============================================================================
 
-class Quiz(Base):
-    """
-    One-to-One relationship with LearnVideo.
-    Each video can have exactly one quiz to test comprehension.
-    """
-    __tablename__ = "quizzes"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-    video_id = Column(Integer, ForeignKey("learn_videos.id"), unique=True, nullable=False)
-    
-    # Relationships
-    video = relationship("LearnVideo", foreign_keys=[video_id])
-    questions = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")
-
-
-class QuizQuestion(Base):
-    """
-    Multiple choice questions for each quiz.
-    Each question has 4 options (A, B, C, D) with one correct answer.
-    Awards XP points when answered correctly.
-    """
-    __tablename__ = "quiz_questions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=False)
-    
-    # Question content
-    question_text = Column(Text, nullable=False)
-    
-    # Multiple choice options
-    option_a = Column(String, nullable=False)
-    option_b = Column(String, nullable=False)
-    option_c = Column(String, nullable=False)
-    option_d = Column(String, nullable=False)
-    
-    # Correct answer stored as "A", "B", "C", or "D"
-    correct_option = Column(String(1), nullable=False)
-    
-    # XP awarded for correct answer (default 10 points)
-    xp_value = Column(Integer, default=10, nullable=False)
-    
-    # Relationship
-    quiz = relationship("Quiz", back_populates="questions")
-
-
-class UserQuizAttempt(Base):
-    """
-    Tracks quiz completion to prevent infinite XP farming.
-    Records each user's quiz attempts with their score and completion time.
-    """
-    __tablename__ = "user_quiz_attempts"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=False)
-    
-    # Results
-    score = Column(Integer, nullable=False)  # Number of correct answers
-    completed_at = Column(DateTime, nullable=False)
-    
-    # Relationships
-    user = relationship("User")
-    quiz = relationship("Quiz")
 
 
 # ============================================================================
