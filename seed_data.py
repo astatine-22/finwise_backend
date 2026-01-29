@@ -33,7 +33,7 @@ def reset_and_seed(db):
     # 2. Define Real Quiz Questions Dictionary
     quiz_data = {
         # === MODULE 1: STOCK MARKET BASICS ===
-        "How the Stock Market Works": [
+        "How does the stock market work?": [
             {"q": "What does IPO stand for?", "a": "Initial Public Offering", "b": "Indian Public Office", "c": "Internal Profit Order", "d": "Initial Private Owner", "correct": "A"},
             {"q": "What do you actually own when you buy a share?", "a": "A digital token", "b": "A partial ownership in the company", "c": "A debt paper", "d": "Nothing, it's just gambling", "correct": "B"},
             {"q": "Which is a major Stock Exchange in India?", "a": "NYSE", "b": "NSE", "c": "FOREX", "d": "NASDAQ", "correct": "B"},
