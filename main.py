@@ -74,6 +74,7 @@ async def startup_event():
     print("🚀 Starting FinWise API server...")
     perform_safe_migration()
     print("✅ Server startup complete.")
+    print("🔐 Auth System Loaded: bcrypt + plaintext support enabled")
 
 # =============================================================================
 # CORS CONFIGURATION - Cloud Ready
@@ -104,7 +105,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30  # 30 days
 
 # Password Hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt", "plaintext"], deprecated=["plaintext"])
 
 # OAuth2 Scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -440,6 +441,7 @@ def signup(user: SignupRequest, db: Session = Depends(get_db)):
     if db_user:
         raise HTTPException(status_code=400, detail="Email ID already exists")
 
+    print(f"DEBUG: Attempting to create user: {user.email}")
     hashed_password = pwd_context.hash(user.password)
     new_user = models.User(
         name=user.name,
@@ -450,6 +452,7 @@ def signup(user: SignupRequest, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    print(f"DEBUG: User created successfully: {new_user.id}")
 
     return {"message": "User created successfully"}
 
@@ -457,6 +460,7 @@ def signup(user: SignupRequest, db: Session = Depends(get_db)):
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(user: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate user and return JWT."""
+    print(f"DEBUG: Login attempt for: {user.email}")
     db_user = db.query(models.User).filter(models.User.email == user.email.lower()).first()
     
     # Check if user exists
@@ -469,6 +473,7 @@ def login(user: LoginRequest, db: Session = Depends(get_db)):
     
     # Verify password
     if not pwd_context.verify(user.password, db_user.password):
+        print(f"DEBUG: Password verification failed for {user.email}")
         raise HTTPException(status_code=400, detail="Invalid email or password")
 
     # Check if password needs an update (e.g. if it was plaintext)
