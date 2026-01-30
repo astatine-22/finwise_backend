@@ -133,28 +133,8 @@ GOOGLE_CLIENT_ID = os.getenv(
 )
 
 # --- AUTH PYDANTIC MODELS ---
-
-class SignupRequest(BaseModel):
-    name: str
-    email: str
-    email_verified: bool = False
-    password: str
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-class GoogleLoginRequest(BaseModel):
-    token: str
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
-    user_id: int
-    name: str
-
-class SimpleResponse(BaseModel):
-    message: str
+# NOTE: Main model definitions are below in the "Pydantic Models (Data Shapes)" section
+# to avoid duplication and maintain consistency
 
 
 
