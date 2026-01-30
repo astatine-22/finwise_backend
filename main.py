@@ -363,7 +363,7 @@ class SavingsGoalResponse(BaseModel):
     current_amount: float
     deadline: Optional[date] = None
     icon_name: str
-    progress_percentage: float
+    progress_percent: int
 
     class Config:
         orm_mode = True
@@ -584,7 +584,7 @@ def create_goal(goal: CreateGoalRequest, db: Session = Depends(get_db)):
         "current_amount": new_goal.current_amount,
         "deadline": new_goal.deadline,
         "icon_name": new_goal.icon_name,
-        "progress_percentage": 0.0
+        "progress_percent": 0
     }
 
 # 8. GET SAVINGS GOALS
@@ -609,7 +609,7 @@ def get_goals(email: str, db: Session = Depends(get_db)):
             "current_amount": g.current_amount,
             "deadline": g.deadline,
             "icon_name": g.icon_name,
-            "progress_percentage": round(progress, 1)
+            "progress_percent": int(progress)
         })
         
     return result
@@ -639,7 +639,7 @@ def deposit_to_goal(goal_id: int, request: DepositGoalRequest, db: Session = Dep
         "current_amount": goal.current_amount,
         "deadline": goal.deadline,
         "icon_name": goal.icon_name,
-        "progress_percentage": round(progress, 1)
+        "progress_percent": int(progress)
     }
 
 
