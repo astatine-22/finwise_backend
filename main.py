@@ -309,7 +309,7 @@ class ExpenseResponse(BaseModel):
     date: str
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class BudgetSummaryResponse(BaseModel):
     total_spent: float
@@ -366,7 +366,7 @@ class SavingsGoalResponse(BaseModel):
     progress_percent: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 
@@ -813,7 +813,7 @@ class LearnVideoResponse(BaseModel):
     embed_url: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
     
     @staticmethod
     def from_orm(obj):
@@ -1051,177 +1051,12 @@ def complete_lesson(request: LessonCompleteRequest, db: Session = Depends(get_db
     return {"message": "Lesson completed! +100 XP earned."}
 
 
-# --- Quiz Endpoints ---
-
-@app.get("/api/learn/quiz/{video_id}", response_model=QuizResponse)
-def get_quiz(video_id: int, db: Session = Depends(get_db)):
-    """
-    GET /api/learn/quiz/{video_id}
-    
-    Fetches the quiz associated with a specific video.
-    Returns quiz questions WITHOUT correct answers for security.
-    """
-    # First verify the video exists
-    video = db.query(models.LearnVideo).filter(models.LearnVideo.id == video_id).first()
-    if not video:
-        raise HTTPException(status_code=404, detail="Video not found")
-    
-    # Find quiz for this video
-    quiz = db.query(models.Quiz).filter(models.Quiz.video_id == video_id).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found for this video")
-    
-    # Get all questions for this quiz
-    questions = db.query(models.QuizQuestion).filter(models.QuizQuestion.quiz_id == quiz.id).all()
-    
-    return {
-        "id": quiz.id,
-        "title": quiz.title,
-        "video_id": quiz.video_id,
-        "questions": questions
-    }
 
 
-@app.post("/api/learn/quiz/check-answer")
-def check_answer(request: AnswerCheckRequest, db: Session = Depends(get_db)):
-    """
-    POST /api/learn/quiz/check-answer
     
-    Checks if the user's selected answer is correct.
-    Awards XP immediately for correct answers (prevents XP farming).
-    Returns whether answer was correct and the correct option.
-    """
-    # Find user
-    user = db.query(models.User).filter(models.User.email == request.email.lower()).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Find question
-    question = db.query(models.QuizQuestion).filter(models.QuizQuestion.id == request.question_id).first()
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
-    
-    # Check if answer is correct
-    is_correct = request.selected_option.upper() == question.correct_option.upper()
-    
-    xp_message = "Wrong answer"
-    
-    if is_correct:
-        # Check if user already answered this question correctly (prevent farming)
-        already_answered = db.query(models.UserQuizProgress).filter(
-            models.UserQuizProgress.user_id == user.id,
-            models.UserQuizProgress.question_id == question.id,
-            models.UserQuizProgress.is_correct == True
-        ).first()
-        
-        if not already_answered:
-            # Award XP
-            user.xp = (user.xp or 0) + question.xp_value
-            
-            # Record progress
-            progress = models.UserQuizProgress(
-                user_id=user.id,
-                question_id=question.id,
-                selected_option=request.selected_option.upper(),
-                is_correct=True
-            )
-            db.add(progress)
-            db.commit()
-            
-            xp_message = f"+{question.xp_value} XP"
-        else:
-            xp_message = "Already answered correctly"
-    else:
-        # Record wrong attempt (optional, for analytics)
-        progress = models.UserQuizProgress(
-            user_id=user.id,
-            question_id=question.id,
-            selected_option=request.selected_option.upper(),
-            is_correct=False
-        )
-        db.add(progress)
-        db.commit()
-    
-    return {
-        "is_correct": is_correct,
-        "correct_option": question.correct_option,
-        "xp_message": xp_message
-    }
 
+    
 
-@app.post("/api/learn/quiz/claim-bonus")
-def claim_bonus(request: BonusRequest, db: Session = Depends(get_db)):
-    """
-    POST /api/learn/quiz/claim-bonus
-    
-    Claims bonus XP for completing all questions correctly.
-    Prevents duplicate claims.
-    """
-    # Find user
-    user = db.query(models.User).filter(models.User.email == request.email.lower()).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Find quiz
-    quiz = db.query(models.Quiz).filter(models.Quiz.id == request.quiz_id).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found")
-    
-    # Check if bonus already claimed
-    already_claimed = db.query(models.UserQuizProgress).filter(
-        models.UserQuizProgress.user_id == user.id,
-        models.UserQuizProgress.quiz_id == quiz.id,
-        models.UserQuizProgress.bonus_claimed == True
-    ).first()
-    
-    if already_claimed:
-        return {
-            "success": False,
-            "message": "Bonus already claimed for this quiz",
-            "xp_bonus": 0
-        }
-    
-    # Get all questions for this quiz
-    questions = db.query(models.QuizQuestion).filter(models.QuizQuestion.quiz_id == quiz.id).all()
-    question_ids = [q.id for q in questions]
-    
-    # Check if user answered all questions correctly
-    correct_answers = db.query(models.UserQuizProgress).filter(
-        models.UserQuizProgress.user_id == user.id,
-        models.UserQuizProgress.question_id.in_(question_ids),
-        models.UserQuizProgress.is_correct == True
-    ).distinct(models.UserQuizProgress.question_id).all()
-    
-    if len(correct_answers) != len(questions):
-        return {
-            "success": False,
-            "message": "Must answer all questions correctly to claim bonus",
-            "xp_bonus": 0
-        }
-    
-    # Award bonus XP (20% of total quiz XP)
-    total_quiz_xp = sum(q.xp_value for q in questions)
-    bonus_xp = int(total_quiz_xp * 0.2)
-    
-    user.xp = (user.xp or 0) + bonus_xp
-    
-    # Mark bonus as claimed
-    bonus_record = models.UserQuizProgress(
-        user_id=user.id,
-        quiz_id=quiz.id,
-        question_id=questions[0].id,  # Use first question as reference
-        selected_option="BONUS",
-        is_correct=True,
-        bonus_claimed=True
-    )
-    db.add(bonus_record)
-    db.commit()
-    
-    return {
-        "success": True,
-        "message": f"Perfect score! Bonus claimed: +{bonus_xp} XP",
-        "xp_bonus": bonus_xp
-    }
 
 
 
