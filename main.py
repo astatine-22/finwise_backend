@@ -98,37 +98,65 @@ app.add_middleware(
 # SECURITY CONFIGURATION
 # =============================================================================
 
-# JWT Configuration
-# Read from environment variable in production, fallback to default for local dev
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production-finwise-2024")
+# JWT Settings
+SECRET_KEY = os.getenv("SECRET_KEY", "supersecret-finwise-key-change-in-prod")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30  # 30 days
 
-# Password hashing
-# We support "plaintext" for backward compatibility with existing users
-pwd_context = CryptContext(schemes=["bcrypt", "plaintext"], deprecated=["plaintext"])
+# Password Hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# OAuth2 scheme for token authentication
+# OAuth2 Scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-# --- GOOGLE OAUTH CONFIGURATION ---
-# Read from environment variable in production
-GOOGLE_CLIENT_ID = os.getenv(
-    "GOOGLE_CLIENT_ID", 
-    "783108831764-djrpp609l2rj7kch5imn32d5rb474qf7.apps.googleusercontent.com"
-)
 
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create a JWT access token."""
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """
+    Generate a JWT token with expiration.
+    """
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+# --- GOOGLE OAUTH CONFIGURATION ---
+GOOGLE_CLIENT_ID = os.getenv(
+    "GOOGLE_CLIENT_ID", 
+    "783108831764-djrpp609l2rj7kch5imn32d5rb474qf7.apps.googleusercontent.com"
+)
+
+# --- AUTH PYDANTIC MODELS ---
+
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    email_verified: bool = False
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class GoogleLoginRequest(BaseModel):
+    token: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user_id: int
+    name: str
+
+class SimpleResponse(BaseModel):
+    message: str
+
+
+
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
