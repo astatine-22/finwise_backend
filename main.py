@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import yfinance as yf
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -338,10 +338,36 @@ class ProfilePictureUpdate(BaseModel):
     profile_picture: str  # Base64 encoded image
 
 
+
 class ProfileUpdate(BaseModel):
     email: str
     name: Optional[str] = None
     profile_picture: Optional[str] = None
+
+
+class CreateGoalRequest(BaseModel):
+    email: str
+    title: str
+    target_amount: float
+    deadline: Optional[str] = None  # ISO date string (YYYY-MM-DD)
+
+
+class DepositGoalRequest(BaseModel):
+    amount: float
+
+
+class SavingsGoalResponse(BaseModel):
+    id: int
+    title: str
+    target_amount: float
+    current_amount: float
+    deadline: Optional[date] = None
+    icon_name: str
+    progress_percentage: float
+
+    class Config:
+        orm_mode = True
+
 
 
 # --- HELPER FUNCTION: Date Range Calculator ---
@@ -517,7 +543,105 @@ def update_budget_limit(request: BudgetLimitUpdate, db: Session = Depends(get_db
     user.budget_limit = request.budget_limit
     db.commit()
     
+
+    
     return {"message": f"Budget limit updated to ₹{request.budget_limit:,.2f}"}
+
+
+# --- SAVINGS GOALS ROUTES ---
+
+# 7. CREATE SAVINGS GOAL
+@app.post("/api/goals", response_model=SavingsGoalResponse)
+def create_goal(goal: CreateGoalRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == goal.email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Convert string date to object if provided
+    deadline_date = None
+    if goal.deadline:
+        try:
+            deadline_date = datetime.strptime(goal.deadline, "%Y-%m-%d").date()
+        except ValueError:
+            pass # Or raise error
+            
+    new_goal = models.SavingsGoal(
+        user_id=user.id,
+        title=goal.title,
+        target_amount=goal.target_amount,
+        current_amount=0.0,
+        deadline=deadline_date
+    )
+    
+    db.add(new_goal)
+    db.commit()
+    db.refresh(new_goal)
+    
+    return {
+        "id": new_goal.id,
+        "title": new_goal.title,
+        "target_amount": new_goal.target_amount,
+        "current_amount": new_goal.current_amount,
+        "deadline": new_goal.deadline,
+        "icon_name": new_goal.icon_name,
+        "progress_percentage": 0.0
+    }
+
+# 8. GET SAVINGS GOALS
+@app.get("/api/goals/{email}", response_model=List[SavingsGoalResponse])
+def get_goals(email: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == email.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    goals = db.query(models.SavingsGoal).filter(models.SavingsGoal.user_id == user.id).all()
+    
+    result = []
+    for g in goals:
+        progress = 0.0
+        if g.target_amount > 0:
+            progress = (g.current_amount / g.target_amount) * 100
+        
+        result.append({
+            "id": g.id,
+            "title": g.title,
+            "target_amount": g.target_amount,
+            "current_amount": g.current_amount,
+            "deadline": g.deadline,
+            "icon_name": g.icon_name,
+            "progress_percentage": round(progress, 1)
+        })
+        
+    return result
+
+# 9. DEPOSIT TO GOAL
+@app.put("/api/goals/{goal_id}/deposit", response_model=SavingsGoalResponse)
+def deposit_to_goal(goal_id: int, request: DepositGoalRequest, db: Session = Depends(get_db)):
+    goal = db.query(models.SavingsGoal).filter(models.SavingsGoal.id == goal_id).first()
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+        
+    if request.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+        
+    goal.current_amount += request.amount
+    db.commit()
+    db.refresh(goal)
+    
+    progress = 0.0
+    if goal.target_amount > 0:
+        progress = (goal.current_amount / goal.target_amount) * 100
+        
+    return {
+        "id": goal.id,
+        "title": goal.title,
+        "target_amount": goal.target_amount,
+        "current_amount": goal.current_amount,
+        "deadline": goal.deadline,
+        "icon_name": goal.icon_name,
+        "progress_percentage": round(progress, 1)
+    }
+
 
 
 # --- BUDGET & EXPENSE ROUTES ---
