@@ -512,7 +512,8 @@ def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db)):
         return {
             "access_token": access_token,
             "token_type": "bearer",
-            "user": {"name": user.name, "xp": user.xp, "profile_picture": user.profile_picture}
+            "user_id": user.id,
+            "name": user.name
         }
 
     except ValueError as e:
