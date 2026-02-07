@@ -908,8 +908,8 @@ def reset_learn_db(db: Session = Depends(get_db)):
     """
     try:
         # IMPORTANT: Delete quizzes first due to foreign key constraint
-        # The quizzes table has a foreign key reference to learn_videos
-        deleted_quizzes = db.query(models.Quiz).delete()
+        # Using raw SQL since Quiz model doesn't exist in models.py
+        db.execute(text("DELETE FROM quizzes"))
         
         # Delete user video progress (also has foreign key to learn_videos)
         deleted_progress = db.query(models.UserVideoProgress).delete()
@@ -918,7 +918,7 @@ def reset_learn_db(db: Session = Depends(get_db)):
         deleted_videos = db.query(models.LearnVideo).delete()
         db.commit()
         
-        print(f"🗑️ Deleted {deleted_quizzes} quizzes, {deleted_progress} progress records, {deleted_videos} videos")
+        print(f"🗑️ Deleted quizzes, {deleted_progress} progress records, {deleted_videos} videos")
         
         # Now call the seed endpoint logic
         return seed_learn_videos(db)
