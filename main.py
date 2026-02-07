@@ -903,13 +903,19 @@ def get_learn_categories(db: Session = Depends(get_db)):
 def reset_learn_db(db: Session = Depends(get_db)):
     """
     Triggers a HARD RESET of the learn content.
+    Clears all existing videos and reseeds with the latest 15 videos.
+    Safe to call from production - no shell access needed.
     """
-    import seed_data
     try:
-        seed_data.reset_and_seed(db)
-        return {"message": "Database reset and seeded successfully!"}
+        # Delete all existing videos
+        db.query(models.LearnVideo).delete()
+        db.commit()
+        
+        # Now call the seed endpoint logic
+        return seed_learn_videos(db)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
 
 
 @app.post("/api/learn/seed", response_model=SimpleResponse)
