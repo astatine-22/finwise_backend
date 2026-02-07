@@ -907,18 +907,23 @@ def reset_learn_db(db: Session = Depends(get_db)):
     Safe to call from production - no shell access needed.
     """
     try:
-        # IMPORTANT: Delete quizzes first due to foreign key constraint
-        # Using raw SQL since Quiz model doesn't exist in models.py
+        # IMPORTANT: Delete in correct order due to foreign key constraints
+        # quiz_questions → quizzes → user_video_progress → learn_videos
+        
+        # 1. Delete quiz questions first (references quizzes)
+        db.execute(text("DELETE FROM quiz_questions"))
+        
+        # 2. Delete quizzes (references learn_videos)
         db.execute(text("DELETE FROM quizzes"))
         
-        # Delete user video progress (also has foreign key to learn_videos)
+        # 3. Delete user video progress (references learn_videos)
         deleted_progress = db.query(models.UserVideoProgress).delete()
         
-        # Now we can safely delete all existing videos
+        # 4. Finally delete all existing videos
         deleted_videos = db.query(models.LearnVideo).delete()
         db.commit()
         
-        print(f"🗑️ Deleted quizzes, {deleted_progress} progress records, {deleted_videos} videos")
+        print(f"🗑️ Deleted quiz_questions, quizzes, {deleted_progress} progress records, {deleted_videos} videos")
         
         # Now call the seed endpoint logic
         return seed_learn_videos(db)
