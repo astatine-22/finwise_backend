@@ -951,7 +951,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "How the Stock Market Works",
             "description": "Oliver Elfenbaum explains the history of the Dutch East India Company and how modern stock markets function today. \n\nKEY LEARNINGS:\n• The history of the first stock market.\n• What 'Shares' actually represent.\n• Why companies go public (IPOs).",
-            "youtube_video_id": "p7HKvqRI_Bo",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/How%20does%20the%20stock%20market%20work_%20-%20Oliver%20Elfenbaum.mp4?alt=media&token=cc7ae80e-fb9b-4cca-b20c-ef955f136dd9",
             "thumbnail_url": "https://img.youtube.com/vi/p7HKvqRI_Bo/maxresdefault.jpg",
             "category": "Investing Basics",
             "duration_minutes": 5,
@@ -961,7 +961,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "What is the Stock Market?",
             "description": "A clear and simple explanation of what the stock market actually is and how it connects buyers and sellers. \n\nKEY LEARNINGS:\n• The concept of a stock exchange.\n• How supply and demand affect prices.\n• The role of a broker.",
-            "youtube_video_id": "ZCFkWDdmXG8",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/Explained%20_%20The%20Stock%20Market%20_%20FULL%20EPISODE%20_%20Netflix.mp4?alt=media&token=30c10d63-9ae5-430e-aac3-0cb3ea265eb1",
             "thumbnail_url": "https://img.youtube.com/vi/ZCFkWDdmXG8/maxresdefault.jpg",
             "category": "Investing Basics",
             "duration_minutes": 4,
@@ -971,7 +971,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "Buying Your First Stock",
             "description": "A step-by-step guide on how to actually purchase your first stock using a brokerage app. \n\nKEY LEARNINGS:\n• How to open a Demat account.\n• Placing a market order vs. limit order.\n• Understanding ticker symbols.",
-            "youtube_video_id": "bb6_M_srMBk",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/Buying%20Your%20First%20Stock.mp4?alt=media&token=57723feb-c32a-411c-8f91-146be7dc3aee",
             "thumbnail_url": "https://img.youtube.com/vi/bb6_M_srMBk/maxresdefault.jpg",
             "category": "Investing Basics",
             "duration_minutes": 6,
@@ -981,7 +981,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "Investing for Beginners",
             "description": "The ultimate guide to starting your investment journey, covering the mindset and basic strategies you need. \n\nKEY LEARNINGS:\n• The difference between saving and investing.\n• Risk vs. Reward.\n• Long-term thinking.",
-            "youtube_video_id": "lNdOtlpmH5U",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/videoplayback.mp4?alt=media&token=d633e264-5d63-4199-a3d6-64b3416b9100",
             "thumbnail_url": "https://img.youtube.com/vi/lNdOtlpmH5U/maxresdefault.jpg",
             "category": "Investing Basics",
             "duration_minutes": 8,
@@ -991,7 +991,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "Mutual Funds Explained",
             "description": "What are mutual funds and why are they safer than individual stocks? This video breaks it down. \n\nKEY LEARNINGS:\n• How a fund manager handles your money.\n• Diversification benefits.\n• Types of funds (Equity, Debt, Hybrid).",
-            "youtube_video_id": "JUtes-k-VX4",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/Investing%20Basics_%20Mutual%20Funds.mp4?alt=media&token=6fd53ea3-8f1b-4692-a049-26eba1b7bbf0",
             "thumbnail_url": "https://img.youtube.com/vi/JUtes-k-VX4/maxresdefault.jpg",
             "category": "Mutual Funds",
             "duration_minutes": 5,
@@ -1001,7 +1001,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "SIP vs Lumpsum",
             "description": "Should you invest all at once or little by little? We compare Systematic Investment Plans (SIP) with Lumpsum investing. \n\nKEY LEARNINGS:\n• Benefits of Rupee Cost Averaging.\n• Why SIP is better for beginners.\n• When to use Lumpsum.",
-            "youtube_video_id": "KIsY08zUrOU",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/SIP%20vs.%20Lumpsum%20Mutual%20Fund.mp4?alt=media&token=04fe7acb-04cc-46b8-b6a2-64999505a72f",
             "thumbnail_url": "https://img.youtube.com/vi/KIsY08zUrOU/maxresdefault.jpg",
             "category": "Mutual Funds",
             "duration_minutes": 4,
@@ -1011,7 +1011,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "Power of Compounding",
             "description": "Einstein called it the 8th wonder of the world. See how small investments grow into massive wealth over time. \n\nKEY LEARNINGS:\n• The math behind compound interest.\n• Starting early vs. starting late.\n• The exponential growth curve.",
-            "youtube_video_id": "NuhVK4r-VQw",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/The%20Power%20of%20Compounding.mp4?alt=media&token=2f693199-6e82-4a96-b5dc-dd4e987cf830",
             "thumbnail_url": "https://img.youtube.com/vi/NuhVK4r-VQw/maxresdefault.jpg",
             "category": "Wealth Building",
             "duration_minutes": 5,
@@ -1021,7 +1021,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "Index Funds vs Mutual Funds",
             "description": "Active vs Passive investing. Why do many experts recommend low-cost Index Funds? \n\nKEY LEARNINGS:\n• What is an Index Fund (Nifty 50).\n• Expense ratios and fees.\n• Active management risks.",
-            "youtube_video_id": "DUL6cLZfmEM",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/Index%20Funds%20vs%20Mutual%20Funds%20vs%20ETFs%20for%20Beginners.mp4?alt=media&token=62854912-74d7-4a00-9b30-c30d7f4bc913",
             "thumbnail_url": "https://img.youtube.com/vi/DUL6cLZfmEM/maxresdefault.jpg",
             "category": "Mutual Funds",
             "duration_minutes": 6,
@@ -1031,7 +1031,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "50/30/20 Budget Rule",
             "description": "The simplest budgeting rule to manage your salary effectively without stress. \n\nKEY LEARNINGS:\n• 50% for Needs (Rent, Food).\n• 30% for Wants (Entertainment).\n• 20% for Savings & Investments.",
-            "youtube_video_id": "XLD0f5Nzr3c",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/20%20Money%20Rule%20EXPLAINED%20(Easiest%20Budgeting%20Method!).mp4?alt=media&token=b540baa1-e498-4483-a6b3-a924a614ebe4",
             "thumbnail_url": "https://img.youtube.com/vi/XLD0f5Nzr3c/maxresdefault.jpg",
             "category": "Personal Finance",
             "duration_minutes": 4,
@@ -1041,7 +1041,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "Emergency Fund Guide",
             "description": "Before you invest, you need a safety net. Learn how much cash you should keep for emergencies. \n\nKEY LEARNINGS:\n• Why you need 6 months of expenses.\n• Where to park this money (Liquid Funds).\n• Avoiding debt during crises.",
-            "youtube_video_id": "R2OvsQCubGw",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/What%20is%20an%20Emergency%20Fund.mp4?alt=media&token=a538a8ec-e6fc-4f97-8859-ba5500e6b526",
             "thumbnail_url": "https://img.youtube.com/vi/R2OvsQCubGw/maxresdefault.jpg",
             "category": "Personal Finance",
             "duration_minutes": 5,
@@ -1051,7 +1051,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "Income Tax Basics (80C, TDS)",
             "description": "Tax season doesn't have to be scary. Learn the basics of saving tax in India. \n\nKEY LEARNINGS:\n• Section 80C deductions (PPF, ELSS).\n• What is TDS?\n• Old Regime vs New Regime.",
-            "youtube_video_id": "iTUv3GlFsds",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/Basic%20Concepts%20of%20Income%20Tax%20-Deductions%2C%20Rebate%2C%20FY%2C%20AY%2C%20TDS%2C%20Advance%20Tax.mp4?alt=media&token=0b653e15-1586-4e6e-9f4b-e78a49dc3dbd",
             "thumbnail_url": "https://img.youtube.com/vi/iTUv3GlFsds/maxresdefault.jpg",
             "category": "Taxation",
             "duration_minutes": 7,
@@ -1061,7 +1061,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "Bitcoin for Beginners",
             "description": "A beginner-friendly introduction to the world's first cryptocurrency. \n\nKEY LEARNINGS:\n• What is Bitcoin?\n• Decentralization explained.\n• Digital Gold concept.",
-            "youtube_video_id": "s4g1XFU8Gto",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/Bitcoin%20explained%20and%20made%20simple.mp4?alt=media&token=8e43d86c-7ab7-485c-b964-906f14ba1eb8",
             "thumbnail_url": "https://img.youtube.com/vi/s4g1XFU8Gto/maxresdefault.jpg",
             "category": "Crypto",
             "duration_minutes": 6,
@@ -1071,7 +1071,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "What is Blockchain?",
             "description": "The technology behind crypto. Understand how the blockchain ledger actually works. \n\nKEY LEARNINGS:\n• How blocks are chained together.\n• Why it is immutable and secure.\n• Use cases beyond money.",
-            "youtube_video_id": "SSo_EIwHSd4",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/How%20does%20a%20blockchain%20work%20-%20Simply%20Explained.mp4?alt=media&token=4916b163-9ed4-48de-beab-f70e56575f85",
             "thumbnail_url": "https://img.youtube.com/vi/SSo_EIwHSd4/maxresdefault.jpg",
             "category": "Crypto",
             "duration_minutes": 5,
@@ -1081,7 +1081,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "Crypto vs Stocks",
             "description": "Comparing the two biggest asset classes. Which one is right for you? \n\nKEY LEARNINGS:\n• Volatility differences.\n• Ownership rights.\n• Market hours (24/7 vs 9-3).",
-            "youtube_video_id": "HEWgveRCsQ4",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/Crypto%20vs.%20Stocks_%20What%E2%80%99s%20the%20Difference%20%26%20Which%20One%20Is%20Right%20for%20You_.mp4?alt=media&token=04e9ba69-53ec-4b7c-b2b4-70a3afeffbc4",
             "thumbnail_url": "https://img.youtube.com/vi/HEWgveRCsQ4/maxresdefault.jpg",
             "category": "Crypto",
             "duration_minutes": 5,
@@ -1091,7 +1091,7 @@ def seed_learn_videos(db: Session = Depends(get_db)):
         {
             "title": "How to Buy Crypto Safe",
             "description": "Safety first! How to buy cryptocurrency without getting scammed or hacked. \n\nKEY LEARNINGS:\n• Choosing a safe exchange.\n• Hot wallets vs Cold wallets.\n• Spotting phishing scams.",
-            "youtube_video_id": "tXMtUT5MNQw",
+            "youtube_video_id": "https://firebasestorage.googleapis.com/v0/b/finwise-479119.firebasestorage.app/o/How%20to%20Buy%20Crypto%20SAFELY%20as%20a%20BEGINNER.mp4?alt=media&token=fdf91606-0115-4e70-bc6d-2e67f6645986",
             "thumbnail_url": "https://img.youtube.com/vi/tXMtUT5MNQw/maxresdefault.jpg",
             "category": "Crypto",
             "duration_minutes": 6,
